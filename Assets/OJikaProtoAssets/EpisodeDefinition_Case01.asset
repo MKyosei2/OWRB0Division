@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: EpisodeDefinition_Case01
+  m_EditorClassIdentifier: Assembly-CSharp:OJikaProto:EpisodeDefinition
+  episodeName: "\u7D42\u96FB\u306E\u3044\u306A\u3044\u99C5\uFF08\u30D7\u30ED\u30C8\uFF09"
+  phases:
+  - phaseType: 0
+    title: "\u5C0E\u5165"
+    description: "Enter\u3067\u958B\u59CB"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}
+  - phaseType: 1
+    title: "\u8ABF\u67FB"
+    description: "\u8ABF\u67FB\u30DD\u30A4\u30F3\u30C8\u306B\u8FD1\u3065\u3044\u3066E\u3067\u8A3C\u62E0\u3092\u53D6\u5F97\u3002\u8A3C\u62E0\u304C\u63C3\u3063\u305F\u3089Enter\u3002"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}
+  - phaseType: 2
+    title: "\u53CE\u675F\u4F5C\u6226"
+    description: "\u898F\u7D04\u2192\u5D29\u3057\u2192\u4EA4\u6E09\uFF08F\uFF09\u3067\u6C7A\u7740\u3078\u3002"
+    targetEvidenceCount: 0
+    enemyPrefab: {fileID: 2143947486211357307, guid: 076aabe8bb4e0f24c9874a5549326bb0, type: 3}
+    negotiationDef: {fileID: 11400000, guid: 09b4aca86ddbe3b4f95ec96045f30209, type: 2}
+  - phaseType: 3
+    title: "\u5F8C\u65E5\u8AC7"
+    description: "Enter\u3067\u7D42\u4E86\uFF08\u30D7\u30ED\u30C8\uFF09"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}

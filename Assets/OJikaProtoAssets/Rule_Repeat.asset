@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ae755b74942d9b40bd1f54748557c80, type: 3}
+  m_Name: Rule_Repeat
+  m_EditorClassIdentifier: 
+  ruleType: 2
+  displayName: "\u540C\u3058\u624B\u3092\u7D9A\u3051\u308B\u306A"
+  description: "\u30ED\u30C3\u30AF\u30AA\u30F3\u3092\u7DAD\u6301\u3057\u904E\u304E\u308B\u3068\u9055\u53CD\u3002"
+  gazeSecondsToViolate: 3
+  repeatCountToViolate: 3
+  repeatWindowSeconds: 2
+  hazardSecondsToViolate: 1.5
+  enrageEnemy: 1
+  toast: 1
