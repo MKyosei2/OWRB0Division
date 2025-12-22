@@ -20,11 +20,14 @@ namespace OJikaProto
         private float _toastT;
 
         private EpisodeController _episode;
+        private GameFlowController _flow;
 
         private void Awake()
         {
             CoreEnsure.EnsureAll();
+
             _episode = FindObjectOfType<EpisodeController>();
+            _flow = FindObjectOfType<GameFlowController>();
 
             _audio = GetComponent<AudioSource>();
             if (_audio == null) _audio = gameObject.AddComponent<AudioSource>();
@@ -66,10 +69,13 @@ namespace OJikaProto
 
             if (_enemyLineT > 0f)
                 _enemyLineT -= Time.deltaTime;
+
+            if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
         }
 
         private void OnGUI()
         {
+            // 画面フラッシュ（赤）
             if (_flashA > 0.001f)
             {
                 var prev = GUI.color;
@@ -79,6 +85,22 @@ namespace OJikaProto
             }
 
             GUI.skin.label.fontSize = 14;
+
+            // ✅ タイトル / 終了画面を最優先で描画（上に被せる）
+            if (_flow != null)
+            {
+                if (_flow.State == FlowState.Title)
+                {
+                    DrawTitleScreen(_flow);
+                    return; // タイトル中は他のHUDを描かない（見た目を締める）
+                }
+                if (_flow.State == FlowState.Completed)
+                {
+                    DrawCompletedScreen(_flow);
+                    // 終了画面中でも背景にログ等が欲しければ return を外してOK
+                    return;
+                }
+            }
 
             float y = 12f;
             if (_episode && _episode.Current != null)
@@ -131,8 +153,73 @@ namespace OJikaProto
             }
 
             DrawRulesPanel();
-            DrawNegotiationPanel(); // ✅ ペナルティ表示入り
+            DrawNegotiationPanel();
             DrawRunLog();
+        }
+
+        private void DrawTitleScreen(GameFlowController flow)
+        {
+            float w = 760f, h = 420f;
+            float x = (Screen.width - w) * 0.5f;
+            float y = (Screen.height - h) * 0.5f;
+
+            GUI.Box(new Rect(x, y, w, h), "");
+            GUI.skin.label.fontSize = 26;
+            GUI.Label(new Rect(x + 20, y + 24, w - 40, 34), flow.gameTitle);
+
+            GUI.skin.label.fontSize = 16;
+            GUI.Label(new Rect(x + 20, y + 70, w - 40, 26), flow.subtitle);
+
+            GUI.skin.label.fontSize = 14;
+            GUI.Label(new Rect(x + 20, y + 108, w - 40, 44), flow.conceptLine);
+
+            GUI.Box(new Rect(x + 20, y + 160, w - 40, 170), "CONTROLS");
+            GUI.Label(new Rect(x + 36, y + 190, w - 72, 22), "WASD：移動 / Space：ジャンプ");
+            GUI.Label(new Rect(x + 36, y + 212, w - 72, 22), "LMB：軽攻撃 / RMB：重攻撃 / E：Seal（崩し強）");
+            GUI.Label(new Rect(x + 36, y + 234, w - 72, 22), "Tab：ロックオン（視線規約に注意）");
+            GUI.Label(new Rect(x + 36, y + 256, w - 72, 22), "敵がBroken中＆近距離でF：交渉 → 1/2/3で選択");
+            GUI.Label(new Rect(x + 36, y + 278, w - 72, 22), "調査：ポイント付近でE（交渉成功率ボーナス）");
+
+            GUI.skin.label.fontSize = 15;
+            GUI.Label(new Rect(x + 20, y + h - 64, w - 40, 24), "Enter：START");
+            GUI.skin.label.fontSize = 14;
+            GUI.Label(new Rect(x + 20, y + h - 40, w - 40, 22), "※難易度選択なし（固定）。規約と判断で“難しさ”が変わる。");
+
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
+                flow.StartGame();
+        }
+
+        private void DrawCompletedScreen(GameFlowController flow)
+        {
+            float w = 820f, h = 460f;
+            float x = (Screen.width - w) * 0.5f;
+            float y = (Screen.height - h) * 0.5f;
+
+            GUI.Box(new Rect(x, y, w, h), "EPISODE COMPLETE");
+
+            GUI.skin.label.fontSize = 16;
+            GUI.Label(new Rect(x + 20, y + 44, w - 40, 24), $"結果：{OutcomeText(flow.LastOutcome)}");
+
+            // Outro 3行（EpisodeControllerから）
+            string l1 = "", l2 = "", l3 = "";
+            if (_episode != null) _episode.TryGetOutroText(flow.LastOutcome, out l1, out l2, out l3);
+
+            GUI.skin.label.fontSize = 14;
+            GUI.Label(new Rect(x + 20, y + 78, w - 40, 24), l1);
+            GUI.Label(new Rect(x + 20, y + 102, w - 40, 24), l2);
+            GUI.Label(new Rect(x + 20, y + 126, w - 40, 24), l3);
+
+            GUI.Box(new Rect(x + 20, y + 170, w - 40, 180), "NEXT HOOK");
+            GUI.Label(new Rect(x + 34, y + 198, w - 68, 150), flow.nextHookLine);
+
+            GUI.Label(new Rect(x + 20, y + h - 74, w - 40, 22), "R：同じ1話をやり直す（検証）    T：タイトルへ戻る");
+            GUI.Label(new Rect(x + 20, y + h - 48, w - 40, 22), "※“違反回数”が交渉成功率と崩し猶予を削る。最適解を探せ。");
+
+            if (Event.current.type == EventType.KeyDown)
+            {
+                if (Event.current.keyCode == KeyCode.R) flow.RestartEpisode();
+                if (Event.current.keyCode == KeyCode.T) flow.BackToTitle();
+            }
         }
 
         private static string MakeEnemyLine(string ruleName)
@@ -196,11 +283,9 @@ namespace OJikaProto
             GUI.Box(new Rect(x, y, w, h), def.title);
             GUI.Label(new Rect(x + 12f, y + 34f, w - 24f, 46f), def.prompt);
 
-            // ✅ 現在の違反ペナルティを見せる
             float p = (RunLogManager.Instance != null) ? RunLogManager.Instance.GetNegotiationPenalty() : 0f;
             int vc = (RunLogManager.Instance != null) ? RunLogManager.Instance.ViolationCount : 0;
-            GUI.Label(new Rect(x + 12f, y + 68f, w - 24f, 20f),
-                $"規約違反ペナルティ: -{p:P0}（違反 {vc}回）");
+            GUI.Label(new Rect(x + 12f, y + 68f, w - 24f, 20f), $"規約違反ペナルティ: -{p:P0}（違反 {vc}回）");
 
             float rowY = y + 96f;
             for (int i = 0; i < def.options.Length; i++)

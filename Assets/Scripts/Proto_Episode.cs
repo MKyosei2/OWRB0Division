@@ -73,10 +73,14 @@ namespace OJikaProto
         public EpisodeDefinition episode;
         public CombatDirector combatDirector;
 
+        [Header("Flow")]
+        public bool autoStart = true; // ✅ Flow導入後は false 推奨
+
         public int PhaseIndex { get; private set; }
         public EpisodePhase Current => (episode != null && PhaseIndex < episode.phases.Length) ? episode.phases[PhaseIndex] : null;
 
         public NegotiationOutcome LastOutcome { get; private set; } = NegotiationOutcome.None;
+        public bool IsComplete { get; private set; }
 
         private PlayerCombat _playerCombat;
         private LockOnController _lockOn;
@@ -104,6 +108,15 @@ namespace OJikaProto
                 return;
             }
 
+            if (autoStart)
+                BeginEpisode();
+        }
+
+        public void BeginEpisode()
+        {
+            IsComplete = false;
+            LastOutcome = NegotiationOutcome.None;
+
             PhaseIndex = 0;
             EnterPhase();
         }
@@ -111,9 +124,11 @@ namespace OJikaProto
         public void NextPhase()
         {
             PhaseIndex++;
-            if (PhaseIndex >= episode.phases.Length)
+            if (episode == null || PhaseIndex >= episode.phases.Length)
             {
+                IsComplete = true;
                 EventBus.Instance?.Toast("Episode Complete");
+                EventBus.Instance?.EpisodeCompleted(LastOutcome); // ✅ Flowへ通知
                 return;
             }
             EnterPhase();
@@ -144,7 +159,6 @@ namespace OJikaProto
                     break;
 
                 case EpisodePhaseType.Outro:
-                    // Outro表示はUI側でやる
                     break;
             }
         }
@@ -156,7 +170,6 @@ namespace OJikaProto
             NextPhase();
         }
 
-        // ✅ UIが呼ぶ：結果別の後日談3行
         public bool TryGetOutroText(NegotiationOutcome outcome, out string l1, out string l2, out string l3)
         {
             l1 = l2 = l3 = "";
@@ -167,9 +180,7 @@ namespace OJikaProto
                 var t = episode.outroTexts[i];
                 if (t != null && t.outcome == outcome)
                 {
-                    l1 = t.line1;
-                    l2 = t.line2;
-                    l3 = t.line3;
+                    l1 = t.line1; l2 = t.line2; l3 = t.line3;
                     return true;
                 }
             }

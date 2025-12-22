@@ -72,8 +72,10 @@ namespace OJikaProto.EditorTools
                 Object.DestroyImmediate(enemyTemp);
             }
 
+            // HUD
             new GameObject("HUD").AddComponent<OJikaProto.DebugHUD>();
 
+            // CombatDirector
             var cd = new GameObject("CombatDirector").AddComponent<OJikaProto.CombatDirector>();
             cd.playerSpawn = playerSpawn;
             cd.enemySpawn = enemySpawn;
@@ -87,7 +89,6 @@ namespace OJikaProto.EditorTools
                 AssetDatabase.CreateAsset(neg, negPath);
             }
 
-            // ✅ 交渉3択に“有利証拠”をセット（視覚的に効く）
             if (neg.options == null || neg.options.Length < 3)
             {
                 neg.options = new OJikaProto.NegotiationOption[3]
@@ -97,7 +98,6 @@ namespace OJikaProto.EditorTools
                     new OJikaProto.NegotiationOption{ label="封印（儀式）", baseChance=0.45f, success=OJikaProto.NegotiationOutcome.Seal },
                 };
             }
-
             neg.options[0].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop };
             neg.options[1].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid, OJikaProto.EvidenceTag.Clock_DeviceHint };
             neg.options[2].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.TicketGate_MemoryLoss, OJikaProto.EvidenceTag.Clock_DeviceHint };
@@ -161,9 +161,19 @@ namespace OJikaProto.EditorTools
             ip2.transform.position = new Vector3(2, 0.5f, -1);
             ip2.AddComponent<OJikaProto.InvestigationPoint>().evidenceTag = OJikaProto.EvidenceTag.Clock_DeviceHint;
 
+            // EpisodeController
             var ec = new GameObject("EpisodeController").AddComponent<OJikaProto.EpisodeController>();
             ec.episode = ep;
             ec.combatDirector = cd;
+            ec.autoStart = false; // ✅ Flowが開始する
+
+            // ✅ Flow Controller（タイトル/完了画面）
+            var flow = new GameObject("GameFlow").AddComponent<OJikaProto.GameFlowController>();
+            flow.episode = ec;
+            flow.player = player.GetComponent<OJikaProto.PlayerController>();
+            flow.playerCombat = player.GetComponent<OJikaProto.PlayerCombat>();
+            flow.lockOn = player.GetComponent<OJikaProto.LockOnController>();
+            flow.cameraRig = rig;
 
             AssetDatabase.SaveAssets();
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());

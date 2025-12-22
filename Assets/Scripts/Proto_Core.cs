@@ -35,6 +35,9 @@ namespace OJikaProto
 
         public event Action<RuleViolationSignal> OnRuleViolation;
 
+        // ✅ 追加：エピソード完了通知（タイトル/終了画面に使う）
+        public event Action<NegotiationOutcome> OnEpisodeComplete;
+
         public void Toast(string msg) => OnToast?.Invoke(msg);
         public void PlayerDied() => OnPlayerDied?.Invoke();
 
@@ -47,17 +50,20 @@ namespace OJikaProto
                 intensity = Mathf.Clamp01(intensity)
             });
         }
+
+        public void EpisodeCompleted(NegotiationOutcome outcome)
+        {
+            OnEpisodeComplete?.Invoke(outcome);
+        }
     }
 
     public class RunLogManager : SimpleSingleton<RunLogManager>
     {
-        // ✅ ペナルティ設計（プロト）
         public const float NegotiationPenaltyPerViolation = 0.05f; // 1違反あたり -5%
         public const float NegotiationPenaltyMax = 0.30f;          // 最大 -30%
 
-        // ✅ Break復帰の強化（違反ごとに +20% 速度、最大 +100%）
-        public const float BreakRecoverBoostPerViolation = 0.20f;
-        public const float BreakRecoverBoostMax = 1.00f;
+        public const float BreakRecoverBoostPerViolation = 0.20f;   // 1違反あたり +20%
+        public const float BreakRecoverBoostMax = 1.00f;            // 最大 +100%
 
         [Serializable] public class RuleViolation { public string ruleName; public string reason; public float time; }
         [Serializable] public class NegotiationLog { public string option; public float chance; public bool success; public float time; }
@@ -90,7 +96,6 @@ namespace OJikaProto
         public void LogViolation(string ruleName, string reason)
         {
             ViolationCount++;
-
             Violations.Add(new RuleViolation
             {
                 ruleName = ruleName,
