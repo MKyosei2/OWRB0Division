@@ -33,7 +33,6 @@ namespace OJikaProto
         public event Action<string> OnToast;
         public event Action OnPlayerDied;
 
-        // ✅ 規約違反演出用
         public event Action<RuleViolationSignal> OnRuleViolation;
 
         public void Toast(string msg) => OnToast?.Invoke(msg);
@@ -52,12 +51,22 @@ namespace OJikaProto
 
     public class RunLogManager : SimpleSingleton<RunLogManager>
     {
+        // ✅ ペナルティ設計（プロト）
+        public const float NegotiationPenaltyPerViolation = 0.05f; // 1違反あたり -5%
+        public const float NegotiationPenaltyMax = 0.30f;          // 最大 -30%
+
+        // ✅ Break復帰の強化（違反ごとに +20% 速度、最大 +100%）
+        public const float BreakRecoverBoostPerViolation = 0.20f;
+        public const float BreakRecoverBoostMax = 1.00f;
+
         [Serializable] public class RuleViolation { public string ruleName; public string reason; public float time; }
         [Serializable] public class NegotiationLog { public string option; public float chance; public bool success; public float time; }
 
         public float RunStartTime { get; private set; }
         public int PlayerHitCount { get; private set; }
         public float PlayerDamageTaken { get; private set; }
+
+        public int ViolationCount { get; private set; }
 
         public readonly List<RuleViolation> Violations = new();
         public readonly List<NegotiationLog> Negotiations = new();
@@ -67,6 +76,7 @@ namespace OJikaProto
             RunStartTime = Time.time;
             PlayerHitCount = 0;
             PlayerDamageTaken = 0f;
+            ViolationCount = 0;
             Violations.Clear();
             Negotiations.Clear();
         }
@@ -79,6 +89,8 @@ namespace OJikaProto
 
         public void LogViolation(string ruleName, string reason)
         {
+            ViolationCount++;
+
             Violations.Add(new RuleViolation
             {
                 ruleName = ruleName,
@@ -96,6 +108,17 @@ namespace OJikaProto
                 success = success,
                 time = Time.time - RunStartTime
             });
+        }
+
+        public float GetNegotiationPenalty()
+        {
+            return Mathf.Min(NegotiationPenaltyMax, ViolationCount * NegotiationPenaltyPerViolation);
+        }
+
+        public float GetBreakRecoverMultiplier()
+        {
+            float boost = Mathf.Min(BreakRecoverBoostMax, ViolationCount * BreakRecoverBoostPerViolation);
+            return 1f + boost; // 1.0～2.0
         }
     }
 

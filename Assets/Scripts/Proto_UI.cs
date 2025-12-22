@@ -6,13 +6,13 @@ namespace OJikaProto
     public class DebugHUD : MonoBehaviour
     {
         [Header("Feedback (Optional)")]
-        public AudioClip ruleViolationSfx; // 任意：Inspectorで入れる
+        public AudioClip ruleViolationSfx;
         public float flashFadeSpeed = 2.4f;
 
         private AudioSource _audio;
         private Texture2D _flatTex;
 
-        private float _flashA;           // 0-1
+        private float _flashA;
         private string _enemyLine;
         private float _enemyLineT;
 
@@ -37,7 +37,7 @@ namespace OJikaProto
             if (EventBus.Instance != null)
             {
                 EventBus.Instance.OnToast += (msg) => { _toast = msg; _toastT = 2f; };
-                EventBus.Instance.OnRuleViolation += OnRuleViolation; // ✅
+                EventBus.Instance.OnRuleViolation += OnRuleViolation;
             }
         }
 
@@ -70,7 +70,6 @@ namespace OJikaProto
 
         private void OnGUI()
         {
-            // ✅ 画面フラッシュ（赤）
             if (_flashA > 0.001f)
             {
                 var prev = GUI.color;
@@ -118,11 +117,9 @@ namespace OJikaProto
                 }
             }
 
-            // Toast
             if (_toastT > 0f && !string.IsNullOrEmpty(_toast))
                 GUI.Box(new Rect(12, Screen.height - 70, 520, 42), _toast);
 
-            // ✅ 敵の一言（違反時）
             if (_enemyLineT > 0f && !string.IsNullOrEmpty(_enemyLine))
             {
                 float w = 620f, h = 44f;
@@ -134,19 +131,15 @@ namespace OJikaProto
             }
 
             DrawRulesPanel();
-            DrawNegotiationPanel();
+            DrawNegotiationPanel(); // ✅ ペナルティ表示入り
             DrawRunLog();
         }
 
         private static string MakeEnemyLine(string ruleName)
         {
             if (string.IsNullOrEmpty(ruleName)) return "……";
-
-            // ルール名に合わせて台詞を変える（アトラス風：短く、刺す）
-            if (ruleName.Contains("視線"))
-                return "怪異『見たね。……見た。』";
-            if (ruleName.Contains("同じ手"))
-                return "怪異『学習した。次は通らない。』";
+            if (ruleName.Contains("視線")) return "怪異『見たね。……見た。』";
+            if (ruleName.Contains("同じ手")) return "怪異『学習した。次は通らない。』";
             return "怪異『違反。違反。違反。』";
         }
 
@@ -196,30 +189,36 @@ namespace OJikaProto
 
             var def = nm.Current;
 
-            float w = 640f, h = 320f;
+            float w = 680f, h = 350f;
             float x = (Screen.width - w) * 0.5f;
             float y = (Screen.height - h) * 0.5f;
 
             GUI.Box(new Rect(x, y, w, h), def.title);
             GUI.Label(new Rect(x + 12f, y + 34f, w - 24f, 46f), def.prompt);
 
-            float rowY = y + 86f;
+            // ✅ 現在の違反ペナルティを見せる
+            float p = (RunLogManager.Instance != null) ? RunLogManager.Instance.GetNegotiationPenalty() : 0f;
+            int vc = (RunLogManager.Instance != null) ? RunLogManager.Instance.ViolationCount : 0;
+            GUI.Label(new Rect(x + 12f, y + 68f, w - 24f, 20f),
+                $"規約違反ペナルティ: -{p:P0}（違反 {vc}回）");
+
+            float rowY = y + 96f;
             for (int i = 0; i < def.options.Length; i++)
             {
                 var o = def.options[i];
 
-                float baseC, bonus, finalC;
+                float baseC, bonus, penalty, finalC;
                 int have, total;
-                nm.TryComputeChance(i, out baseC, out bonus, out finalC, out have, out total);
+                nm.TryComputeChance(i, out baseC, out bonus, out penalty, out finalC, out have, out total);
 
                 GUI.Label(new Rect(x + 12f, rowY, w - 24f, 20f),
-                    $"{i + 1}. {o.label}   成功率: {finalC:P0} （基本 {baseC:P0} + ボーナス {bonus:P0}）");
+                    $"{i + 1}. {o.label}   成功率: {finalC:P0} （基本 {baseC:P0} + 証拠 {bonus:P0} - 違反 {penalty:P0}）");
 
                 string evText = NegotiationManager.EvidenceListToText(o.evidenceBonusTags);
                 string prog = (total > 0) ? $"  [{have}/{total}]" : "";
                 GUI.Label(new Rect(x + 32f, rowY + 18f, w - 44f, 20f), $"有利証拠: {evText}{prog}");
 
-                rowY += 50f;
+                rowY += 54f;
             }
 
             GUI.Label(new Rect(x + 12f, y + h - 28f, w - 24f, 24f), "1/2/3：選択  Esc：閉じる");
@@ -244,7 +243,7 @@ namespace OJikaProto
             float ty = y + 24f;
             GUI.Label(new Rect(x + 10f, ty, w - 20f, 18f), $"被弾回数: {log.PlayerHitCount} / 被ダメージ(概算): {log.PlayerDamageTaken:0}");
             ty += 18f;
-            GUI.Label(new Rect(x + 10f, ty, w - 20f, 18f), $"規約違反: {log.Violations.Count}");
+            GUI.Label(new Rect(x + 10f, ty, w - 20f, 18f), $"規約違反: {log.ViolationCount}  / 交渉ペナルティ: -{log.GetNegotiationPenalty():P0}");
             ty += 18f;
 
             int max = 6;

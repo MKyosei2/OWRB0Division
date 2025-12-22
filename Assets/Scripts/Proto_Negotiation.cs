@@ -1,4 +1,4 @@
-// Assets/Scripts/Proto_Negotiation.cs
+ï»¿// Assets/Scripts/Proto_Negotiation.cs
 using System.Text;
 using UnityEngine;
 
@@ -9,12 +9,12 @@ namespace OJikaProto
     [System.Serializable]
     public class NegotiationOption
     {
-        public string label = "’âíiŠúŒÀ•t‚«j";
-        [TextArea] public string description = "ŠúŒÀ•t‚«‚Ì’âí‚ğ’ñˆÄ‚·‚éB";
+        public string label = "åœæˆ¦ï¼ˆæœŸé™ä»˜ãï¼‰";
+        [TextArea] public string description = "æœŸé™ä»˜ãã®åœæˆ¦ã‚’ææ¡ˆã™ã‚‹ã€‚";
 
         [Range(0f, 1f)] public float baseChance = 0.65f;
 
-        // ‚»‚ë‚Á‚Ä‚¢‚ê‚Î +10%/ŒÂiÅ‘å+20%j
+        // ãã‚ã£ã¦ã„ã‚Œã° +10%/å€‹ï¼ˆæœ€å¤§+20%ï¼‰
         public EvidenceTag[] evidenceBonusTags;
 
         public NegotiationOutcome success = NegotiationOutcome.Truce;
@@ -23,14 +23,14 @@ namespace OJikaProto
     [CreateAssetMenu(menuName = "OJikaProto/NegotiationDefinition", fileName = "NegotiationDefinition_Case01")]
     public class NegotiationDefinition : ScriptableObject
     {
-        public string title = "’âíŒğÂ";
-        [TextArea] public string prompt = "‰öˆÙ‚Í•ö‚ê‚Ä‚¢‚éB¡‚È‚çğŒŸ‘æ‚Åû‘©‚Å‚«‚éB";
+        public string title = "åœæˆ¦äº¤æ¸‰";
+        [TextArea] public string prompt = "æ€ªç•°ã¯å´©ã‚Œã¦ã„ã‚‹ã€‚ä»Šãªã‚‰æ¡ä»¶æ¬¡ç¬¬ã§åæŸã§ãã‚‹ã€‚";
 
         public NegotiationOption[] options = new NegotiationOption[3]
         {
-            new NegotiationOption{ label="’âíiŠúŒÀ•t‚«j", baseChance=0.65f, success=NegotiationOutcome.Truce },
-            new NegotiationOption{ label="Œ_–ñi‹¦—Íj", baseChance=0.50f, success=NegotiationOutcome.Contract },
-            new NegotiationOption{ label="••ˆói‹V®j", baseChance=0.45f, success=NegotiationOutcome.Seal },
+            new NegotiationOption{ label="åœæˆ¦ï¼ˆæœŸé™ä»˜ãï¼‰", baseChance=0.65f, success=NegotiationOutcome.Truce },
+            new NegotiationOption{ label="å¥‘ç´„ï¼ˆå”åŠ›ï¼‰", baseChance=0.50f, success=NegotiationOutcome.Contract },
+            new NegotiationOption{ label="å°å°ï¼ˆå„€å¼ï¼‰", baseChance=0.45f, success=NegotiationOutcome.Seal },
         };
 
         public float cooldownSeconds = 12f;
@@ -80,9 +80,17 @@ namespace OJikaProto
             _director = null;
         }
 
-        public bool TryComputeChance(int optionIndex, out float baseChance, out float bonus, out float finalChance, out int have, out int total)
+        // âœ… UI/ãƒ­ã‚°ç”¨ï¼šæœ€çµ‚æˆåŠŸç‡ã‚’â€œåˆ†è§£â€ã—ã¦è¿”ã™
+        public bool TryComputeChance(
+            int optionIndex,
+            out float baseChance,
+            out float bonus,
+            out float penalty,
+            out float finalChance,
+            out int have,
+            out int total)
         {
-            baseChance = 0f; bonus = 0f; finalChance = 0f; have = 0; total = 0;
+            baseChance = 0f; bonus = 0f; penalty = 0f; finalChance = 0f; have = 0; total = 0;
 
             if (!IsOpen || Current == null) return false;
             if (optionIndex < 0 || optionIndex >= Current.options.Length) return false;
@@ -102,13 +110,17 @@ namespace OJikaProto
             }
 
             bonus = Mathf.Min(MaxBonus, have * BonusPerEvidence);
-            finalChance = Mathf.Clamp01(baseChance + bonus);
+
+            // âœ… è¦ç´„é•åãƒšãƒŠãƒ«ãƒ†ã‚£
+            penalty = (RunLogManager.Instance != null) ? RunLogManager.Instance.GetNegotiationPenalty() : 0f;
+
+            finalChance = Mathf.Clamp01(baseChance + bonus - penalty);
             return true;
         }
 
         public static string EvidenceListToText(EvidenceTag[] tags)
         {
-            if (tags == null || tags.Length == 0) return "i—L—˜Ø‹’‚È‚µj";
+            if (tags == null || tags.Length == 0) return "ï¼ˆæœ‰åˆ©è¨¼æ‹ ãªã—ï¼‰";
             var sb = new StringBuilder();
             for (int i = 0; i < tags.Length; i++)
             {
@@ -123,9 +135,9 @@ namespace OJikaProto
             if (!IsOpen || Current == null) return;
             if (idx < 0 || idx >= Current.options.Length) return;
 
-            float baseChance, bonus, chance;
+            float baseC, bonus, penalty, chance;
             int have, total;
-            TryComputeChance(idx, out baseChance, out bonus, out chance, out have, out total);
+            TryComputeChance(idx, out baseC, out bonus, out penalty, out chance, out have, out total);
 
             var opt = Current.options[idx];
             bool success = Random.value <= chance;

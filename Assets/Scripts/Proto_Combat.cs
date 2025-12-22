@@ -1,4 +1,4 @@
-// Assets/Scripts/Proto_Combat.cs
+ï»¿// Assets/Scripts/Proto_Combat.cs
 using UnityEngine;
 
 namespace OJikaProto
@@ -56,7 +56,14 @@ namespace OJikaProto
         private void Update()
         {
             if (!IsBroken) return;
-            _t -= Time.deltaTime;
+
+            // âœ… é•åãŒå¤šã„ã»ã©ã€Breakã‹ã‚‰ã®å¾©å¸°ãŒæ—©ã„ï¼ˆå´©ã—çŒ¶äºˆãŒçŸ­ã„ï¼‰
+            float mul = 1f;
+            if (RunLogManager.Instance != null)
+                mul = RunLogManager.Instance.GetBreakRecoverMultiplier(); // 1.0ï½2.0
+
+            _t -= Time.deltaTime * mul;
+
             if (_t <= 0f)
             {
                 IsBroken = false;
@@ -215,7 +222,7 @@ namespace OJikaProto
             {
                 var d = h.GetComponentInParent<Damageable>();
                 if (d == null) continue;
-                if (d.gameObject == gameObject) continue; // ©•ª‚ÍœŠO
+                if (d.gameObject == gameObject) continue;
 
                 var b = h.GetComponentInParent<Breakable>();
                 d.ApplyDamage(dmg);
@@ -364,14 +371,12 @@ namespace OJikaProto
         {
             if (_episode == null || _enemy == null) return;
 
-            // ŒğÂŠJnFBroken’†•‹ß‹——£•F
             if (Input.GetKeyDown(KeyCode.F) && _enemyBrk != null && _enemyBrk.IsBroken)
             {
                 if (_player && Vector3.Distance(_player.position, _enemy.transform.position) <= negotiationRange)
                     NegotiationManager.Instance?.Begin(_neg, _episode, _enemyCtrl, this);
             }
 
-            // “¢”°Œˆ’…
             if (_enemyHp != null && _enemyHp.IsDead)
             {
                 CleanupEnemy();
@@ -396,7 +401,6 @@ namespace OJikaProto
 
         private void OnPlayerDied()
         {
-            // ‘¦ƒŠƒgƒ‰ƒCi“ïˆÕ“x‘I‘ğ‚È‚µ‚ÌŠjj
             if (_playerHp) _playerHp.ResetHP();
             if (_player && playerSpawn) { _player.position = playerSpawn.position; _player.rotation = playerSpawn.rotation; }
 
