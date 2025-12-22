@@ -1,4 +1,4 @@
-// Assets/Scripts/Proto_Flow.cs
+ï»¿// Assets/Scripts/Proto_Flow.cs
 using UnityEngine;
 
 namespace OJikaProto
@@ -11,14 +11,14 @@ namespace OJikaProto
 
         [Header("Text")]
         public string gameTitle = "OJI-KA";
-        public string subtitle = "CASE 01 : I“d‚Ì‚¢‚È‚¢‰w";
-        [TextArea] public string conceptLine = "g‹K–ñh‚ªí“¬ƒ‹[ƒ‹‚ğ•Ï‚¦‚é / ’²¸‚ªŒğÂ‚ğ•Ï‚¦‚é";
+        public string subtitle = "CASE 01 : çµ‚é›»ã®ã„ãªã„é§…";
+        [TextArea] public string conceptLine = "â€œè¦ç´„â€ãŒæˆ¦é—˜ãƒ«ãƒ¼ãƒ«ã‚’å¤‰ãˆã‚‹ / èª¿æŸ»ãŒäº¤æ¸‰ã‚’å¤‰ãˆã‚‹";
 
         [TextArea]
         public string nextHookLine =
-            "Ÿ‰ñƒtƒbƒNF\n" +
-            "w‰w‚Ì‰üD‚ÍA’N‚Ì‹L‰¯‚ğ‹z‚Á‚Ä‚¢‚éHx\n" +
-            "gŠúŒÀ•t‚«’âíh‚Ì—P—\‚ªØ‚ê‚é‘O‚ÉAŸ‚ÌŒ»ê‚ÖB";
+            "æ¬¡å›ãƒ•ãƒƒã‚¯ï¼š\n" +
+            "ã€é§…ã®æ”¹æœ­ã¯ã€èª°ã®è¨˜æ†¶ã‚’å¸ã£ã¦ã„ã‚‹ï¼Ÿã€\n" +
+            "â€œæœŸé™ä»˜ãåœæˆ¦â€ã®çŒ¶äºˆãŒåˆ‡ã‚Œã‚‹å‰ã«ã€æ¬¡ã®ç¾å ´ã¸ã€‚";
 
         [Header("References (auto-find if empty)")]
         public EpisodeController episode;
@@ -30,12 +30,16 @@ namespace OJikaProto
         public FlowState State { get; private set; } = FlowState.Title;
         public NegotiationOutcome LastOutcome { get; private set; } = NegotiationOutcome.None;
 
+        private float _baseFixedDelta;
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
 
             CoreEnsure.EnsureAll();
+
+            _baseFixedDelta = Time.fixedDeltaTime;
 
             if (episode == null) episode = FindObjectOfType<EpisodeController>();
             if (player == null) player = FindObjectOfType<PlayerController>();
@@ -84,24 +88,29 @@ namespace OJikaProto
             SetState(FlowState.Title);
         }
 
+        private void ForceTimeNormal()
+        {
+            Time.timeScale = 1f;
+            Time.fixedDeltaTime = _baseFixedDelta;
+        }
+
         private void SetState(FlowState s)
         {
+            // âœ… çŠ¶æ…‹ãŒå¤‰ã‚ã‚‹ãŸã³ã«æ™‚é–“ã‚’å¿…ãšæˆ»ã™ï¼ˆæ¼”å‡ºã®å–ã‚Šæ®‹ã—é˜²æ­¢ï¼‰
+            ForceTimeNormal();
+
             State = s;
 
-            // ‘€ì§Œäiƒ^ƒCƒgƒ‹/Š®—¹’†‚Í“®‚¯‚È‚¢j
             bool canControl = (State == FlowState.Playing);
 
             if (player != null) player.enabled = canControl;
             if (playerCombat != null) playerCombat.enabled = canControl;
             if (lockOn != null) lockOn.enabled = canControl;
 
-            // ƒJƒƒ‰‚Íí‚É“®‚¢‚Ä—Ç‚¢iŒ©‰h‚¦—Dæj
             if (cameraRig != null) cameraRig.enabled = true;
 
-            // ƒGƒsƒ\[ƒh©“®is‚ÍFlow‚ªs‚¤
             if (episode != null) episode.autoStart = false;
 
-            // ƒ}ƒEƒX§ŒäiŠÈˆÕj
             if (State == FlowState.Playing)
             {
                 Cursor.lockState = CursorLockMode.Locked;

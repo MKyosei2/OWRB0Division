@@ -9,6 +9,14 @@ namespace OJikaProto
         public AudioClip ruleViolationSfx;
         public float flashFadeSpeed = 2.4f;
 
+        [Header("Time Distortion on Violation")]
+        [Range(0.05f, 1f)] public float violationSlowScale = 0.25f;
+        [Range(0.02f, 0.6f)] public float violationSlowDuration = 0.12f;
+        public float timeRecoverSpeed = 6.0f;
+
+        [Header("Objective Navi (Bottom-Right)")]
+        public bool showObjectiveNavi = true;
+
         private AudioSource _audio;
         private Texture2D _flatTex;
 
@@ -21,6 +29,11 @@ namespace OJikaProto
 
         private EpisodeController _episode;
         private GameFlowController _flow;
+
+        // Time distortion runtime
+        private float _baseFixedDelta;
+        private float _slowT;
+        private bool _recovering;
 
         private void Awake()
         {
@@ -37,6 +50,8 @@ namespace OJikaProto
             _flatTex.SetPixel(0, 0, Color.white);
             _flatTex.Apply();
 
+            _baseFixedDelta = Time.fixedDeltaTime;
+
             if (EventBus.Instance != null)
             {
                 EventBus.Instance.OnToast += (msg) => { _toast = msg; _toastT = 2f; };
@@ -48,6 +63,9 @@ namespace OJikaProto
         {
             if (EventBus.Instance != null)
                 EventBus.Instance.OnRuleViolation -= OnRuleViolation;
+
+            Time.timeScale = 1f;
+            Time.fixedDeltaTime = _baseFixedDelta;
         }
 
         private void OnRuleViolation(RuleViolationSignal sig)
@@ -55,6 +73,9 @@ namespace OJikaProto
             _flashA = Mathf.Max(_flashA, Mathf.Clamp01(sig.intensity) * 0.9f);
             _enemyLine = MakeEnemyLine(sig.ruleName);
             _enemyLineT = 2.0f;
+
+            _slowT = Mathf.Max(_slowT, violationSlowDuration);
+            _recovering = false;
 
             if (ruleViolationSfx != null && _audio != null)
                 _audio.PlayOneShot(ruleViolationSfx, 1f);
@@ -71,11 +92,53 @@ namespace OJikaProto
                 _enemyLineT -= Time.deltaTime;
 
             if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
+
+            UpdateTimeDistortion();
+        }
+
+        private void UpdateTimeDistortion()
+        {
+            if (_flow != null && _flow.State != FlowState.Playing)
+            {
+                if (Time.timeScale != 1f)
+                {
+                    Time.timeScale = 1f;
+                    Time.fixedDeltaTime = _baseFixedDelta;
+                }
+                _slowT = 0f;
+                _recovering = false;
+                return;
+            }
+
+            if (_slowT > 0f)
+            {
+                _slowT -= Time.unscaledDeltaTime;
+                Time.timeScale = violationSlowScale;
+                Time.fixedDeltaTime = _baseFixedDelta * Time.timeScale;
+
+                if (_slowT <= 0f)
+                    _recovering = true;
+
+                return;
+            }
+
+            if (_recovering)
+            {
+                float ts = Mathf.MoveTowards(Time.timeScale, 1f, timeRecoverSpeed * Time.unscaledDeltaTime);
+                Time.timeScale = ts;
+                Time.fixedDeltaTime = _baseFixedDelta * Time.timeScale;
+
+                if (Mathf.Abs(Time.timeScale - 1f) < 0.001f)
+                {
+                    Time.timeScale = 1f;
+                    Time.fixedDeltaTime = _baseFixedDelta;
+                    _recovering = false;
+                }
+            }
         }
 
         private void OnGUI()
         {
-            // 画面フラッシュ（赤）
             if (_flashA > 0.001f)
             {
                 var prev = GUI.color;
@@ -86,18 +149,16 @@ namespace OJikaProto
 
             GUI.skin.label.fontSize = 14;
 
-            // ✅ タイトル / 終了画面を最優先で描画（上に被せる）
             if (_flow != null)
             {
                 if (_flow.State == FlowState.Title)
                 {
                     DrawTitleScreen(_flow);
-                    return; // タイトル中は他のHUDを描かない（見た目を締める）
+                    return;
                 }
                 if (_flow.State == FlowState.Completed)
                 {
-                    DrawCompletedScreen(_flow);
-                    // 終了画面中でも背景にログ等が欲しければ return を外してOK
+                    DrawCompletedScreen(_flow); // ✅ リザルト強化
                     return;
                 }
             }
@@ -155,8 +216,14 @@ namespace OJikaProto
             DrawRulesPanel();
             DrawNegotiationPanel();
             DrawRunLog();
+
+            if (showObjectiveNavi)
+                DrawObjectiveNavi();
         }
 
+        // ------------------------
+        // Title / Completed
+        // ------------------------
         private void DrawTitleScreen(GameFlowController flow)
         {
             float w = 760f, h = 420f;
@@ -191,34 +258,178 @@ namespace OJikaProto
 
         private void DrawCompletedScreen(GameFlowController flow)
         {
-            float w = 820f, h = 460f;
+            var log = RunLogManager.Instance;
+            var inv = InvestigationManager.Instance;
+
+            // score
+            int score;
+            string rank;
+            string tip;
+            ComputeCaseScore(out score, out rank, out tip);
+
+            float w = 920f, h = 540f;
             float x = (Screen.width - w) * 0.5f;
             float y = (Screen.height - h) * 0.5f;
 
             GUI.Box(new Rect(x, y, w, h), "EPISODE COMPLETE");
 
+            // Header
             GUI.skin.label.fontSize = 16;
             GUI.Label(new Rect(x + 20, y + 44, w - 40, 24), $"結果：{OutcomeText(flow.LastOutcome)}");
 
-            // Outro 3行（EpisodeControllerから）
+            GUI.skin.label.fontSize = 18;
+            GUI.Label(new Rect(x + 20, y + 74, w - 40, 24), $"CASE SCORE：{score}  / 100    Rank：{rank}");
+
+            // Outro 3 lines
             string l1 = "", l2 = "", l3 = "";
             if (_episode != null) _episode.TryGetOutroText(flow.LastOutcome, out l1, out l2, out l3);
-
             GUI.skin.label.fontSize = 14;
-            GUI.Label(new Rect(x + 20, y + 78, w - 40, 24), l1);
-            GUI.Label(new Rect(x + 20, y + 102, w - 40, 24), l2);
-            GUI.Label(new Rect(x + 20, y + 126, w - 40, 24), l3);
+            GUI.Label(new Rect(x + 20, y + 108, w - 40, 20), l1);
+            GUI.Label(new Rect(x + 20, y + 128, w - 40, 20), l2);
+            GUI.Label(new Rect(x + 20, y + 148, w - 40, 20), l3);
 
-            GUI.Box(new Rect(x + 20, y + 170, w - 40, 180), "NEXT HOOK");
-            GUI.Label(new Rect(x + 34, y + 198, w - 68, 150), flow.nextHookLine);
+            // Metrics box
+            float bx = x + 20, by = y + 178, bw = w - 40, bh = 190;
+            GUI.Box(new Rect(bx, by, bw, bh), "RESULT METRICS");
 
-            GUI.Label(new Rect(x + 20, y + h - 74, w - 40, 22), "R：同じ1話をやり直す（検証）    T：タイトルへ戻る");
-            GUI.Label(new Rect(x + 20, y + h - 48, w - 40, 22), "※“違反回数”が交渉成功率と崩し猶予を削る。最適解を探せ。");
+            float lineY = by + 28;
+
+            int violationCount = (log != null) ? log.ViolationCount : 0;
+            int hitCount = (log != null) ? log.PlayerHitCount : 0;
+            float dmgTaken = (log != null) ? log.PlayerDamageTaken : 0f;
+            float penalty = (log != null) ? log.GetNegotiationPenalty() : 0f;
+            float breakMul = (log != null) ? log.GetBreakRecoverMultiplier() : 1f;
+
+            int evC = (inv != null) ? inv.CollectedCount : 0;
+            int evT = (inv != null) ? inv.TargetCount : 0;
+
+            string runTimeText = "-";
+            if (log != null) runTimeText = $"{(Time.time - log.RunStartTime):0.0}s";
+
+            GUI.Label(new Rect(bx + 12, lineY, bw - 24, 20), $"Time: {runTimeText}    Evidence: {evC}/{evT}");
+            lineY += 22;
+            GUI.Label(new Rect(bx + 12, lineY, bw - 24, 20), $"Violations: {violationCount}    Hits: {hitCount}    Damage Taken: {dmgTaken:0}");
+            lineY += 22;
+            GUI.Label(new Rect(bx + 12, lineY, bw - 24, 20), $"Negotiation Penalty: -{penalty:P0}    Break Recover: x{breakMul:0.00}（崩し猶予が短い）");
+            lineY += 26;
+
+            // Negotiation detail (last)
+            string negoLine = "Negotiation: -";
+            if (log != null && log.Negotiations.Count > 0)
+            {
+                var n = log.Negotiations[log.Negotiations.Count - 1];
+                negoLine = $"Negotiation: \"{n.option}\"    Chance: {n.chance:P0}    Success: {n.success}";
+            }
+            GUI.Label(new Rect(bx + 12, lineY, bw - 24, 20), negoLine);
+
+            // Next hook
+            GUI.Box(new Rect(x + 20, y + 380, w - 40, 110), "NEXT HOOK");
+            GUI.Label(new Rect(x + 34, y + 408, w - 68, 78), flow.nextHookLine);
+
+            // Auto tip
+            GUI.Box(new Rect(x + 20, y + 498, w - 40, 30), "NEXT IMPROVEMENT");
+            GUI.Label(new Rect(x + 34, y + 505, w - 68, 20), tip);
+
+            // Controls
+            GUI.Label(new Rect(x + 20, y + h - 36, w - 40, 22), "R：同じ1話をやり直す（検証）    T：タイトルへ戻る");
 
             if (Event.current.type == EventType.KeyDown)
             {
                 if (Event.current.keyCode == KeyCode.R) flow.RestartEpisode();
                 if (Event.current.keyCode == KeyCode.T) flow.BackToTitle();
+            }
+        }
+
+        private void ComputeCaseScore(out int score, out string rank, out string tip)
+        {
+            var log = RunLogManager.Instance;
+
+            // Base
+            float s = 100f;
+
+            int vio = (log != null) ? log.ViolationCount : 0;
+            int hits = (log != null) ? log.PlayerHitCount : 0;
+            float dmg = (log != null) ? log.PlayerDamageTaken : 0f;
+
+            // Penalties tuned for “プロトで気持ちよく差が出る”重み
+            s -= vio * 12f;          // 規約違反は重い
+            s -= hits * 3.5f;        // 被弾は中
+            s -= dmg * 0.12f;        // 被ダメージは微
+
+            // Clamp
+            s = Mathf.Clamp(s, 0f, 100f);
+            score = Mathf.RoundToInt(s);
+
+            if (score >= 90) rank = "S";
+            else if (score >= 75) rank = "A";
+            else if (score >= 60) rank = "B";
+            else if (score >= 45) rank = "C";
+            else rank = "D";
+
+            // Tip
+            if (vio >= 3) tip = "規約違反が多い：ロックオン維持と“同じ手”の連打を減らすと、交渉も崩し猶予も改善。";
+            else if (hits >= 8) tip = "被弾が多い：Seal（E）で崩しを作って“短期決着”へ。距離管理を優先。";
+            else if (dmg >= 120) tip = "被ダメージが大きい：重攻撃連打より“様子見→崩し→交渉”の順で安定。";
+            else tip = "次は“証拠ボーナスを最大化”して交渉成功率を押し上げ、狙った結末を再現してみて。";
+        }
+
+        // ------------------------
+        // In-game panels
+        // ------------------------
+        private void DrawObjectiveNavi()
+        {
+            if (_episode == null || _episode.Current == null) return;
+
+            string title = "目的";
+            string body = BuildObjectiveText(_episode.Current);
+
+            float w = 420f;
+            float h = 92f;
+            float x = Screen.width - w - 12f;
+            float y = Screen.height - h - 12f;
+
+            GUI.Box(new Rect(x, y, w, h), title);
+            GUI.Label(new Rect(x + 12f, y + 26f, w - 24f, h - 32f), body);
+        }
+
+        private string BuildObjectiveText(EpisodePhase p)
+        {
+            switch (p.phaseType)
+            {
+                case EpisodePhaseType.Intro:
+                    return "Enterで開始。\n調査→崩し→交渉で収束させる。";
+
+                case EpisodePhaseType.Investigation:
+                    {
+                        var inv = InvestigationManager.Instance;
+                        int c = inv != null ? inv.CollectedCount : 0;
+                        int t = inv != null ? inv.TargetCount : p.targetEvidenceCount;
+                        string s = $"証拠を集める（{c}/{t}）\n調査ポイント付近でE。";
+                        if (inv != null && c >= t) s += "\n揃ったらEnterで収束作戦へ。";
+                        return s;
+                    }
+
+                case EpisodePhaseType.Combat:
+                    {
+                        bool canNeg = false;
+                        var enemy = FindObjectOfType<EnemyController>();
+                        if (enemy != null)
+                        {
+                            var brk = enemy.GetComponent<Breakable>();
+                            if (brk != null && brk.IsBroken) canNeg = true;
+                        }
+
+                        if (canNeg)
+                            return "敵が崩れている。\n近距離でF→交渉（1/2/3）で決着。";
+
+                        return "敵をBreakさせる。\nE(Seal)で崩しを狙う。\n規約違反は不利になる。";
+                    }
+
+                case EpisodePhaseType.Outro:
+                    return "後日談を確認。\nEnterで完了。";
+
+                default:
+                    return "";
             }
         }
 
@@ -246,7 +457,7 @@ namespace OJikaProto
             GUI.Label(new Rect(x + 18, y + 108, w - 36, 26), l2);
             GUI.Label(new Rect(x + 18, y + 138, w - 36, 26), l3);
 
-            GUI.Label(new Rect(x + 18, y + h - 40, w - 36, 26), "Enter：終了（プロト）");
+            GUI.Label(new Rect(x + 18, y + h - 40, w - 36, 26), "Enter：完了");
 
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
                 ep.NextPhase();
