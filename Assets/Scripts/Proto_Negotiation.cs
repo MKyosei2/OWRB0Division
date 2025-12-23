@@ -1,22 +1,16 @@
-﻿// Assets/Scripts/Proto_Negotiation.cs
-using System.Text;
+﻿using System.Text;
 using UnityEngine;
 
 namespace OJikaProto
 {
-    public enum NegotiationOutcome { None, Truce, Contract, Seal, Slay }
-
     [System.Serializable]
     public class NegotiationOption
     {
         public string label = "停戦（期限付き）";
         [TextArea] public string description = "期限付きの停戦を提案する。";
-
         [Range(0f, 1f)] public float baseChance = 0.65f;
 
-        // そろっていれば +10%/個（最大+20%）
-        public EvidenceTag[] evidenceBonusTags;
-
+        public EvidenceTag[] evidenceBonusTags; // 揃っていれば +10%/個（最大+20%）
         public NegotiationOutcome success = NegotiationOutcome.Truce;
     }
 
@@ -68,6 +62,7 @@ namespace OJikaProto
             _enemy = enemy;
             _director = director;
 
+            FeedbackManager.Instance?.OnNegotiationOpen();
             EventBus.Instance?.Toast("Negotiation Open");
         }
 
@@ -80,7 +75,6 @@ namespace OJikaProto
             _director = null;
         }
 
-        // ✅ UI/ログ用：最終成功率を“分解”して返す
         public bool TryComputeChance(
             int optionIndex,
             out float baseChance,
@@ -91,7 +85,6 @@ namespace OJikaProto
             out int total)
         {
             baseChance = 0f; bonus = 0f; penalty = 0f; finalChance = 0f; have = 0; total = 0;
-
             if (!IsOpen || Current == null) return false;
             if (optionIndex < 0 || optionIndex >= Current.options.Length) return false;
 
@@ -104,16 +97,12 @@ namespace OJikaProto
             if (opt.evidenceBonusTags != null && InvestigationManager.Instance != null)
             {
                 for (int i = 0; i < opt.evidenceBonusTags.Length; i++)
-                {
                     if (InvestigationManager.Instance.Has(opt.evidenceBonusTags[i])) have++;
-                }
             }
 
             bonus = Mathf.Min(MaxBonus, have * BonusPerEvidence);
 
-            // ✅ 規約違反ペナルティ
             penalty = (RunLogManager.Instance != null) ? RunLogManager.Instance.GetNegotiationPenalty() : 0f;
-
             finalChance = Mathf.Clamp01(baseChance + bonus - penalty);
             return true;
         }
@@ -146,12 +135,14 @@ namespace OJikaProto
 
             if (success)
             {
+                FeedbackManager.Instance?.OnNegotiationSuccess();
                 EventBus.Instance?.Toast($"Negotiation Success: {opt.success}");
                 _director?.ResolveByNegotiation(opt.success);
                 Close();
             }
             else
             {
+                FeedbackManager.Instance?.OnNegotiationFail();
                 EventBus.Instance?.Toast($"Negotiation Failed ({chance:P0})");
                 Cooldown = Current.cooldownSeconds;
                 if (Current.failEnrage && _enemy) _enemy.Enrage();

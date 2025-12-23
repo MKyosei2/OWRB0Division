@@ -1,5 +1,4 @@
-﻿// Assets/Scripts/Proto_Episode.cs
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -34,37 +33,16 @@ namespace OJikaProto
         {
             new EpisodePhase{ phaseType=EpisodePhaseType.Intro, title="導入", description="Enterで開始" },
             new EpisodePhase{ phaseType=EpisodePhaseType.Investigation, title="調査", description="調査ポイントに近づいてEで証拠を取得。証拠が揃ったらEnter。", targetEvidenceCount=2 },
-            new EpisodePhase{ phaseType=EpisodePhaseType.Combat, title="収束作戦", description="規約→崩し→交渉（F）で決着へ。", targetEvidenceCount=0 },
-            new EpisodePhase{ phaseType=EpisodePhaseType.Outro, title="後日談", description="Enterで終了（プロト）" },
+            new EpisodePhase{ phaseType=EpisodePhaseType.Combat, title="収束作戦", description="規約→崩し→交渉（F）で決着へ。" },
+            new EpisodePhase{ phaseType=EpisodePhaseType.Outro, title="後日談", description="Enterで完了" },
         };
 
-        [Header("Outro Text (3 lines per outcome)")]
         public OutroTextSet[] outroTexts = new OutroTextSet[]
         {
-            new OutroTextSet{
-                outcome = NegotiationOutcome.Truce,
-                line1 = "駅員は『何も起きていない』と言い張った。",
-                line2 = "あなたはメモに“期限”とだけ書き残す。",
-                line3 = "次の終電が来るまで、猶予は短い。"
-            },
-            new OutroTextSet{
-                outcome = NegotiationOutcome.Contract,
-                line1 = "怪異は条件付きで協力を受け入れた。",
-                line2 = "代償は“見ないこと”。あなたは頷く。",
-                line3 = "駅の影が、味方になった気がした。"
-            },
-            new OutroTextSet{
-                outcome = NegotiationOutcome.Seal,
-                line1 = "封印は完了した。空気が軽くなる。",
-                line2 = "ただし“封”は永久ではないと直感する。",
-                line3 = "あなたは次の場所へ向かう準備を始めた。"
-            },
-            new OutroTextSet{
-                outcome = NegotiationOutcome.Slay,
-                line1 = "討伐。静寂だけが残った。",
-                line2 = "駅の監視映像は、肝心な瞬間だけ欠けていた。",
-                line3 = "あなたの胸に、割り切れない違和感が残る。"
-            },
+            new OutroTextSet{ outcome=NegotiationOutcome.Truce,   line1="駅員は『何も起きていない』と言い張った。", line2="あなたはメモに“期限”とだけ書き残す。", line3="次の終電が来るまで、猶予は短い。" },
+            new OutroTextSet{ outcome=NegotiationOutcome.Contract, line1="怪異は条件付きで協力を受け入れた。", line2="代償は“見ないこと”。あなたは頷く。", line3="駅の影が、味方になった気がした。" },
+            new OutroTextSet{ outcome=NegotiationOutcome.Seal,    line1="封印は完了した。空気が軽くなる。", line2="ただし“封”は永久ではないと直感する。", line3="あなたは次の場所へ向かう準備を始めた。" },
+            new OutroTextSet{ outcome=NegotiationOutcome.Slay,    line1="討伐。静寂だけが残った。", line2="監視映像は、肝心な瞬間だけ欠けていた。", line3="胸に、割り切れない違和感が残る。" },
         };
     }
 
@@ -73,8 +51,7 @@ namespace OJikaProto
         public EpisodeDefinition episode;
         public CombatDirector combatDirector;
 
-        [Header("Flow")]
-        public bool autoStart = true; // ✅ Flow導入後は false 推奨
+        public bool autoStart = false;
 
         public int PhaseIndex { get; private set; }
         public EpisodePhase Current => (episode != null && PhaseIndex < episode.phases.Length) ? episode.phases[PhaseIndex] : null;
@@ -88,7 +65,6 @@ namespace OJikaProto
         private void Awake()
         {
             CoreEnsure.EnsureAll();
-
             _playerCombat = FindObjectOfType<PlayerCombat>();
             _lockOn = FindObjectOfType<LockOnController>();
 
@@ -107,16 +83,13 @@ namespace OJikaProto
                 enabled = false;
                 return;
             }
-
-            if (autoStart)
-                BeginEpisode();
+            if (autoStart) BeginEpisode();
         }
 
         public void BeginEpisode()
         {
             IsComplete = false;
             LastOutcome = NegotiationOutcome.None;
-
             PhaseIndex = 0;
             EnterPhase();
         }
@@ -128,10 +101,26 @@ namespace OJikaProto
             {
                 IsComplete = true;
                 EventBus.Instance?.Toast("Episode Complete");
-                EventBus.Instance?.EpisodeCompleted(LastOutcome); // ✅ Flowへ通知
+                EventBus.Instance?.EpisodeCompleted(LastOutcome);
                 return;
             }
             EnterPhase();
+        }
+
+        // ✅ デバッグ：戦闘へ即ジャンプ（撮影/検証用）
+        public void DebugJumpToCombat()
+        {
+            if (episode == null || episode.phases == null) return;
+            for (int i = 0; i < episode.phases.Length; i++)
+            {
+                if (episode.phases[i].phaseType == EpisodePhaseType.Combat)
+                {
+                    PhaseIndex = i;
+                    EnterPhase();
+                    EventBus.Instance?.Toast("Debug: Jump to COMBAT");
+                    return;
+                }
+            }
         }
 
         private void EnterPhase()

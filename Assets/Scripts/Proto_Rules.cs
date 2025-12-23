@@ -1,143 +1,136 @@
-﻿// Assets/Scripts/Proto_Rules.cs
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
-    public enum RuleType { None, GazeProhibition, RepeatAttackProhibition, HazardFloorProhibition }
+    public enum RuleType
+    {
+        GazeProhibition,
+        RepeatAttackProhibition
+    }
 
-    [CreateAssetMenu(menuName = "OJikaProto/RuleDefinition", fileName = "RuleDefinition_Gaze")]
+    [CreateAssetMenu(menuName = "OJikaProto/RuleDefinition", fileName = "RuleDefinition_New")]
     public class RuleDefinition : ScriptableObject
     {
         public RuleType ruleType = RuleType.GazeProhibition;
+        public string displayName = "Rule";
+        [Range(0f, 1f)] public float feedbackIntensity = 0.85f;
 
-        public string displayName = "視線を合わせるな";
-        [TextArea] public string description = "ロックオンを維持し過ぎると違反。";
-
+        [Header("GazeProhibition")]
         public float gazeSecondsToViolate = 3.0f;
+
+        [Header("RepeatAttackProhibition")]
         public int repeatCountToViolate = 3;
         public float repeatWindowSeconds = 2.0f;
-
-        public bool enrageEnemy = true;
-        public bool toast = true;
-
-        [Range(0f, 1f)] public float feedbackIntensity = 0.85f; // ✅ 演出の強さ
-    }
-
-    internal class RuleState
-    {
-        public float gazeT;
-        public int repeatCount;
-        public float repeatWindowT;
-
-        public void Reset()
-        {
-            gazeT = 0f;
-            repeatCount = 0;
-            repeatWindowT = 0f;
-        }
     }
 
     public class RuleManager : SimpleSingleton<RuleManager>
     {
-        public List<RuleDefinition> activeRules = new();
+        public System.Collections.Generic.List<RuleDefinition> activeRules = new();
 
         private PlayerCombat _playerCombat;
         private LockOnController _lockOn;
-        private EnemyController _enemy;
 
-        private readonly Dictionary<RuleDefinition, RuleState> _states = new();
+        // gaze runtime
+        private float _gazeT;
+
+        // repeat runtime
+        private AttackType _lastType = AttackType.None;
+        private int _repeatCount;
+        private float _repeatWindowT;
+
+        // ✅ UI用：現在の進捗を公開（読み取り専用）
+        public float GazeTimerSeconds => _gazeT;
+        public float RepeatWindowSeconds => _repeatWindowT;
+        public int RepeatCount => _repeatCount;
+        public AttackType RepeatAttackType => _lastType;
 
         private void Start()
         {
-            var pc = FindObjectOfType<PlayerController>();
-            if (pc != null)
-            {
-                _playerCombat = pc.GetComponent<PlayerCombat>();
-                _lockOn = pc.GetComponent<LockOnController>();
-            }
-        }
-
-        private void Update()
-        {
-            if (_playerCombat == null || !_playerCombat.enabled) return;
-            if (_enemy == null) _enemy = FindObjectOfType<EnemyController>();
-
-            foreach (var rule in activeRules)
-            {
-                if (rule == null) continue;
-
-                if (!_states.TryGetValue(rule, out var st))
-                {
-                    st = new RuleState();
-                    _states.Add(rule, st);
-                }
-
-                switch (rule.ruleType)
-                {
-                    case RuleType.GazeProhibition: EvalGaze(rule, st); break;
-                    case RuleType.RepeatAttackProhibition: EvalRepeat(rule, st); break;
-                    case RuleType.HazardFloorProhibition: break; // 未使用
-                }
-            }
+            _playerCombat = FindObjectOfType<PlayerCombat>();
+            _lockOn = FindObjectOfType<LockOnController>();
         }
 
         public void ClearRuntime()
         {
-            foreach (var kv in _states) kv.Value.Reset();
+            _gazeT = 0f;
+            _lastType = AttackType.None;
+            _repeatCount = 0;
+            _repeatWindowT = 0f;
         }
 
-        private void Violate(RuleDefinition rule, string reason)
+        private void Update()
         {
-            RunLogManager.Instance?.LogViolation(rule.displayName, reason);
+            if (activeRules == null || activeRules.Count == 0) return;
 
-            if (rule.toast)
-                EventBus.Instance?.Toast($"Violation: {rule.displayName}");
+            if (_playerCombat == null) _playerCombat = FindObjectOfType<PlayerCombat>();
+            if (_lockOn == null) _lockOn = FindObjectOfType<LockOnController>();
 
-            // ✅ 演出トリガー（フラッシュ/SE/台詞）
-            EventBus.Instance?.RuleViolated(rule.displayName, reason, rule.feedbackIntensity);
-
-            if (rule.enrageEnemy && _enemy)
-                _enemy.Enrage();
-        }
-
-        private void EvalGaze(RuleDefinition rule, RuleState st)
-        {
-            bool locked = _lockOn && _lockOn.enabled && _lockOn.IsLockedOn;
-            if (!locked) { st.gazeT = 0f; return; }
-
-            st.gazeT += Time.deltaTime;
-            if (st.gazeT >= rule.gazeSecondsToViolate)
+            foreach (var r in activeRules)
             {
-                st.gazeT = 0f;
-                Violate(rule, $"LockOn>{rule.gazeSecondsToViolate:0.0}s");
-            }
-        }
+                if (!r) continue;
 
-        private void EvalRepeat(RuleDefinition rule, RuleState st)
-        {
-            if (st.repeatWindowT > 0f)
-            {
-                st.repeatWindowT -= Time.deltaTime;
-                if (st.repeatWindowT <= 0f) { st.repeatCount = 0; st.repeatWindowT = 0f; }
-            }
-
-            if (Time.time - _playerCombat.LastAttackTime < 0.05f)
-            {
-                if (st.repeatWindowT <= 0f)
+                switch (r.ruleType)
                 {
-                    st.repeatWindowT = rule.repeatWindowSeconds;
-                    st.repeatCount = 1;
-                }
-                else st.repeatCount++;
-
-                if (st.repeatCount >= rule.repeatCountToViolate)
-                {
-                    st.repeatCount = 0;
-                    st.repeatWindowT = 0f;
-                    Violate(rule, $"Repeat x{rule.repeatCountToViolate}");
+                    case RuleType.GazeProhibition:
+                        TickGaze(r);
+                        break;
+                    case RuleType.RepeatAttackProhibition:
+                        TickRepeat(r);
+                        break;
                 }
             }
+        }
+
+        private void TickGaze(RuleDefinition r)
+        {
+            bool gazing = (_lockOn != null && _lockOn.IsLockedOn && _lockOn.Target != null);
+            if (gazing) _gazeT += Time.deltaTime;
+            else _gazeT = Mathf.Max(0f, _gazeT - Time.deltaTime * 2f);
+
+            if (_gazeT >= r.gazeSecondsToViolate)
+            {
+                _gazeT = 0f;
+                Violate(r, "視線を合わせ続けた");
+            }
+        }
+
+        private void TickRepeat(RuleDefinition r)
+        {
+            if (_repeatWindowT > 0f) _repeatWindowT -= Time.deltaTime;
+            else { _repeatCount = 0; _lastType = AttackType.None; }
+
+            if (_playerCombat == null) return;
+
+            AttackType t = _playerCombat.LastAttackType;
+            float at = _playerCombat.LastAttackTime;
+
+            // 直近0.2秒以内の攻撃だけ見る（誤検出抑制）
+            if (Time.time - at > 0.2f) return;
+            if (t == AttackType.None) return;
+
+            if (_repeatWindowT <= 0f)
+            {
+                _repeatWindowT = r.repeatWindowSeconds;
+                _repeatCount = 1;
+                _lastType = t;
+                return;
+            }
+
+            if (_lastType == t) _repeatCount++;
+            else { _lastType = t; _repeatCount = 1; }
+
+            if (_repeatCount >= r.repeatCountToViolate)
+            {
+                _repeatCount = 0;
+                _repeatWindowT = 0f;
+                Violate(r, "同じ手を続けた");
+            }
+        }
+
+        private void Violate(RuleDefinition r, string reason)
+        {
+            RunLogManager.Instance?.LogViolation(r.displayName, reason);
+            EventBus.Instance?.RuleViolated(r.displayName, reason, r.feedbackIntensity);
         }
     }
 }

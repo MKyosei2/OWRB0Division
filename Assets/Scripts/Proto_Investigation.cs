@@ -1,4 +1,3 @@
-// Assets/Scripts/Proto_Investigation.cs
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,7 +5,6 @@ namespace OJikaProto
 {
     public enum EvidenceTag
     {
-        None = 0,
         CCTV_Loop,
         StationStaff_Avoid,
         TicketGate_MemoryLoss,
@@ -15,64 +13,62 @@ namespace OJikaProto
 
     public class InvestigationManager : SimpleSingleton<InvestigationManager>
     {
-        private readonly HashSet<EvidenceTag> _tags = new();
+        private readonly HashSet<EvidenceTag> _collected = new();
+
         public int TargetCount { get; private set; } = 2;
-        public int CollectedCount => _tags.Count;
+        public int CollectedCount => _collected.Count;
 
-        public void ResetForEpisode(int target)
+        public void ResetForEpisode(int targetCount)
         {
-            _tags.Clear();
-            TargetCount = Mathf.Max(0, target);
+            _collected.Clear();
+            TargetCount = Mathf.Max(0, targetCount);
+            EventBus.Instance?.Toast($"Investigation Reset ({CollectedCount}/{TargetCount})");
         }
 
-        public void Add(EvidenceTag tag)
-        {
-            if (tag == EvidenceTag.None) return;
-            if (_tags.Add(tag))
-                EventBus.Instance?.Toast($"Evidence + {tag}");
-        }
+        public bool Has(EvidenceTag tag) => _collected.Contains(tag);
 
-        public bool Has(EvidenceTag tag) => _tags.Contains(tag);
+        public void Collect(EvidenceTag tag)
+        {
+            if (_collected.Add(tag))
+                EventBus.Instance?.Toast($"Evidence + {tag} ({CollectedCount}/{TargetCount})");
+        }
     }
 
+    [RequireComponent(typeof(Collider))]
     public class InvestigationPoint : MonoBehaviour
     {
-        public EvidenceTag evidenceTag = EvidenceTag.CCTV_Loop;
-        public float range = 2f;
+        public EvidenceTag evidenceTag;
+        public float interactRadius = 1.6f;
 
-        private bool _used;
+        private bool _done;
         private Transform _player;
+
+        private void Awake()
+        {
+            var col = GetComponent<Collider>();
+            col.isTrigger = true; // AutoSetupÇÃCubeÇ…Ç‡å¯Ç≠
+        }
 
         private void Start()
         {
             var pc = FindObjectOfType<PlayerController>();
-            if (pc != null) _player = pc.transform;
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(transform.position, range);
+            _player = pc ? pc.transform : null;
         }
 
         private void Update()
         {
-            if (_used) return;
+            if (_done) return;
+            if (_player == null) return;
 
-            if (_player == null)
+            float d = Vector3.Distance(_player.position, transform.position);
+            if (d <= interactRadius && Input.GetKeyDown(KeyCode.E))
             {
-                var pc = FindObjectOfType<PlayerController>();
-                if (pc != null) _player = pc.transform;
-                else return;
-            }
+                InvestigationManager.Instance?.Collect(evidenceTag);
+                _done = true;
 
-            if (Vector3.Distance(_player.position, transform.position) > range) return;
-
-            if (Input.GetKeyDown(KeyCode.E))
-            {
-                InvestigationManager.Instance.Add(evidenceTag);
-                _used = true;
-                gameObject.SetActive(false);
+                // å©ÇΩñ⁄Ç≈ï™Ç©ÇÈÇÊÇ§Ç…è¨Ç≥Ç≠Ç∑ÇÈ
+                transform.localScale *= 0.35f;
+                EventBus.Instance?.Toast("Evidence Collected");
             }
         }
     }

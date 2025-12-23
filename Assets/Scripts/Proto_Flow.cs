@@ -1,5 +1,4 @@
-﻿// Assets/Scripts/Proto_Flow.cs
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -38,7 +37,6 @@ namespace OJikaProto
             Instance = this;
 
             CoreEnsure.EnsureAll();
-
             _baseFixedDelta = Time.fixedDeltaTime;
 
             if (episode == null) episode = FindObjectOfType<EpisodeController>();
@@ -96,11 +94,9 @@ namespace OJikaProto
 
         private void SetState(FlowState s)
         {
-            // ✅ 状態が変わるたびに時間を必ず戻す（演出の取り残し防止）
             ForceTimeNormal();
 
             State = s;
-
             bool canControl = (State == FlowState.Playing);
 
             if (player != null) player.enabled = canControl;
