@@ -29,12 +29,12 @@ MonoBehaviour:
   - phaseType: 2
     title: "\u53CE\u675F\u4F5C\u6226"
     description: "\u898F\u7D04\u2192\u5D29\u3057\u2192\u4EA4\u6E09\uFF08F\uFF09\u3067\u6C7A\u7740\u3078\u3002"
-    targetEvidenceCount: 0
+    targetEvidenceCount: 2
     enemyPrefab: {fileID: 2143947486211357307, guid: 076aabe8bb4e0f24c9874a5549326bb0, type: 3}
     negotiationDef: {fileID: 11400000, guid: 09b4aca86ddbe3b4f95ec96045f30209, type: 2}
   - phaseType: 3
     title: "\u5F8C\u65E5\u8AC7"
-    description: "Enter\u3067\u7D42\u4E86\uFF08\u30D7\u30ED\u30C8\uFF09"
+    description: "Enter\u3067\u5B8C\u4E86"
     targetEvidenceCount: 2
     enemyPrefab: {fileID: 0}
     negotiationDef: {fileID: 0}
@@ -53,5 +53,5 @@ MonoBehaviour:
     line3: "\u3042\u306A\u305F\u306F\u6B21\u306E\u5834\u6240\u3078\u5411\u304B\u3046\u6E96\u5099\u3092\u59CB\u3081\u305F\u3002"
   - outcome: 4
     line1: "\u8A0E\u4F10\u3002\u9759\u5BC2\u3060\u3051\u304C\u6B8B\u3063\u305F\u3002"
-    line2: "\u99C5\u306E\u76E3\u8996\u6620\u50CF\u306F\u3001\u809D\u5FC3\u306A\u77AC\u9593\u3060\u3051\u6B20\u3051\u3066\u3044\u305F\u3002"
-    line3: "\u3042\u306A\u305F\u306E\u80F8\u306B\u3001\u5272\u308A\u5207\u308C\u306A\u3044\u9055\u548C\u611F\u304C\u6B8B\u308B\u3002"
+    line2: "\u76E3\u8996\u6620\u50CF\u306F\u3001\u809D\u5FC3\u306A\u77AC\u9593\u3060\u3051\u6B20\u3051\u3066\u3044\u305F\u3002"
+    line3: "\u80F8\u306B\u3001\u5272\u308A\u5207\u308C\u306A\u3044\u9055\u548C\u611F\u304C\u6B8B\u308B\u3002"
