@@ -75,7 +75,7 @@ namespace OJikaProto
             _flow?.StartGame();
             yield return Wait(0.8f);
 
-            Subtitle("【調査】証拠を揃えるほど、交渉の成功率が上がる。", 2.6f);
+            Subtitle("【調査】証拠を揃えるほど、交渉の“成立条件”が満たされる。", 2.6f);
             CameraShotToInvestigationPoint(isA: true, move: 1.0f, hold: 1.0f, fov: 52f);
             yield return Wait(2.3f);
 
@@ -92,7 +92,7 @@ namespace OJikaProto
 
             ForceCollectEvidence(EvidenceTag.StationStaff_Avoid);
             ForceCollectEvidence(EvidenceTag.TicketGate_MemoryLoss);
-            Subtitle("※デモ用：必要証拠を揃えた（成功率が見える状態）", 2.0f);
+            Subtitle("※デモ用：必要証拠を揃えた（成立条件が満たされる）", 2.0f);
             yield return Wait(1.8f);
 
             Subtitle("【収束作戦】規約に従って“崩し(BREAK)”を作り、交渉で決着。", 3.0f);
@@ -105,11 +105,11 @@ namespace OJikaProto
             Subtitle("【規約】視線を合わせ続けるな / 同じ手を続けるな", 2.6f);
             yield return Wait(2.0f);
 
-            Subtitle("（デモ）違反を1回発生させ、ペナルティの存在を見せる。", 2.4f);
+            Subtitle("（デモ）違反を1回発生させ、行政コストとして記録されることを見せる。", 2.4f);
             ForceRuleViolation("視線を合わせるな", "（デモ）強制違反");
             yield return Wait(2.2f);
 
-            Subtitle("違反が増えるほど、交渉成功率が下がり、BREAK復帰が早くなる。", 3.0f);
+            Subtitle("違反や交渉失敗は“学習”になり、次の交渉条件が緩和される（代償は行政コスト）。", 3.0f);
             yield return Wait(2.8f);
 
             Subtitle("【崩し】Seal(E)でBREAKを作る。BREAK中だけ交渉が開ける。", 3.0f);
@@ -174,11 +174,11 @@ namespace OJikaProto
             int vio = (log != null) ? log.ViolationCount : 0;
             int hits = (log != null) ? log.PlayerHitCount : 0;
             float dmg = (log != null) ? log.PlayerDamageTaken : 0f;
-            float pen = (log != null) ? log.GetNegotiationPenalty() : 0f;
-
+            float cost = (log != null) ? log.GetAdministrativeCost01() : 0f;
+            float ins = (log != null) ? log.GetNegotiationInsightBonus() : 0f;
             string outcome = (flow != null) ? flow.LastOutcome.ToString() : "Unknown";
 
-            // 交渉の成功率（今の定義/証拠/違反から算出）
+            // 交渉の成立条件（証拠＋譲歩＋学習で緩和）
             string chances = "";
             var nm = NegotiationManager.Instance;
             if (nm != null && nm.Current != null)
@@ -189,7 +189,7 @@ namespace OJikaProto
                     int have, total;
                     nm.TryComputeChance(i, out baseC, out bonus, out penalty, out finalC, out have, out total);
                     chances += $"{i + 1}. {nm.Current.options[i].label}\n"
-                             + $"   成功率 {finalC:P0}（基本{baseC:P0}+証拠{bonus:P0}-違反{penalty:P0}）\n";
+                             + $"   成立度 {finalC:P0}（証拠/条件の充足度）\n";
                 }
             }
             else
@@ -199,9 +199,9 @@ namespace OJikaProto
 
             return
                 $"OUTCOME : {outcome}\n" +
-                $"VIOLATION : {vio}   PENALTY : -{pen:P0}\n" +
+                $"VIOLATION : {vio}   COST : {cost:P0}   LEARN : +{ins:P0}\n" +
                 $"PLAYER : HIT {hits}   DMG {dmg:0}\n\n" +
-                $"NEGOTIATION CHANCES\n{chances}\n" +
+                $"NEGOTIATION GATES\n{chances}\n" +
                 $"NOTES\n・Take番号は右上表示 / F7,F8で変更\n・Escでこのサマリーを閉じる";
         }
 

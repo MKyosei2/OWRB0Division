@@ -222,7 +222,7 @@ namespace OJikaProto
             {
                 if (Time.unscaledTime - _breakSeenT >= negotiationOpenDelay)
                 {
-                    nm.Choose(autoChooseIndex);
+                    if (nm.HasCounterOffer) nm.AcceptCounterOffer(); else nm.Choose(autoChooseIndex);
                     _nextNegotiateTime = Time.unscaledTime + 2.0f;
                 }
                 return;

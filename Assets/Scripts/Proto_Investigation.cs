@@ -40,6 +40,10 @@ namespace OJikaProto
         public EvidenceTag evidenceTag;
         public float interactRadius = 1.6f;
 
+
+        [Header("Infiltration Mini-Game")]
+        public bool requiresInfiltration = false;
+        public bool blockedDuringLockdown = true;
         private bool _done;
         private Transform _player;
 
@@ -63,6 +67,13 @@ namespace OJikaProto
             float d = Vector3.Distance(_player.position, transform.position);
             if (d <= interactRadius && Input.GetKeyDown(KeyCode.E))
             {
+                var inf = InfiltrationManager.Instance;
+                if (requiresInfiltration && blockedDuringLockdown && inf != null && inf.IsLockdownActive)
+                {
+                    EventBus.Instance?.Toast($"SECURITY LOCKDOWN ({inf.LockdownRemaining:0.0}s)");
+                    return;
+                }
+
                 InvestigationManager.Instance?.Collect(evidenceTag);
                 _done = true;
 

@@ -243,6 +243,7 @@ namespace OJikaProto
             {
                 DrawTopLeftPhase();
                 DrawRulesPanel();
+                DrawInfiltrationHUD();
                 if (showRuleWarnings) DrawRuleWarnings();
                 DrawNegotiationPanel();
                 DrawRunLog();
@@ -512,11 +513,45 @@ namespace OJikaProto
                 foreach (var rule in RuleManager.Instance.activeRules)
                 {
                     if (!rule) continue;
-                    GUI.Label(new Rect(r.x + 12, y, r.width - 24, 18), $"・{rule.displayName}", _bodyStyle);
+                    // ✅ 最初は「？？？」、証拠/違反で確定（RuleManager側で表示を切替）
+                    string line = RuleManager.Instance.GetRulePanelLine(rule);
+                    GUI.Label(new Rect(r.x + 12, y, r.width - 24, 18), $"・{line}", _bodyStyle);
                     y += 18;
                 }
             }
         }
+
+        private void DrawInfiltrationHUD()
+        {
+            // Step5: 潜入ミニゲームHUD（調査フェーズのみ）
+            if (_episode == null || _episode.Current == null) return;
+            if (_episode.Current.phaseType != EpisodePhaseType.Investigation) return;
+
+            var inf = InfiltrationManager.Instance;
+            if (inf == null) return;
+
+            float rx = Screen.width - 380f;
+            float rulesH = 0f;
+            var rm = RuleManager.Instance;
+            if (rm != null && rm.activeRules != null && rm.activeRules.Count > 0)
+                rulesH = 28f + rm.activeRules.Count * 18f + 8f;
+
+            float ry = 12f + rulesH + 8f;
+            Rect r = new Rect(rx, ry, 360f, 66f);
+            DrawRect(r, _panel);
+            DrawRect(new Rect(r.x, r.y, 4, r.height), new Color(0.95f, 0.35f, 0.35f, 1f));
+
+            GUI.Label(new Rect(r.x + 12, r.y + 8, r.width - 24, 18), "潜入（Security）", _smallStyle);
+
+            string line1 = $"ALERT: {(inf.alert01 * 100f):0}%";
+            string line2 = inf.IsLockdownActive
+                ? $"LOCKDOWN: {inf.LockdownRemaining:0.0}s（この間、Eで証拠回収不可）"
+                : "カメラ視界を避けてEで証拠回収（見つかるとLOCKDOWN）";
+
+            GUI.Label(new Rect(r.x + 12, r.y + 26, r.width - 24, 18), line1, _bodyStyle);
+            GUI.Label(new Rect(r.x + 12, r.y + 44, r.width - 24, 18), line2, _smallStyle);
+        }
+
 
         private void DrawRuleWarnings()
         {
@@ -534,12 +569,18 @@ namespace OJikaProto
                 var r = rm.activeRules[i];
                 if (r == null) continue;
 
+                string rn = rm.GetPlayerFacingRuleName(r);
+                bool known = rm.IsRevealed(r);
+
                 if (r.ruleType == RuleType.GazeProhibition)
                 {
                     float remain = Mathf.Max(0f, r.gazeSecondsToViolate - rm.GazeTimerSeconds);
                     if (rm.GazeTimerSeconds > 0.05f)
                     {
-                        DrawPanel(new Rect(x, y, 460, 54), "RULE WARNING", $"視線違反まで：{remain:0.0}s（ロックオン解除推奨）", accent: true);
+                        string body = known
+                            ? $"[{rn}] 視線違反まで：{remain:0.0}s（ロックオン解除推奨）"
+                            : $"[{rn}] 規約違反が近い：{remain:0.0}s";
+                        DrawPanel(new Rect(x, y, 460, 54), "RULE WARNING", body, accent: true);
                         y += 60f;
                     }
                 }
@@ -547,7 +588,10 @@ namespace OJikaProto
                 {
                     if (rm.RepeatWindowSeconds > 0.01f && rm.RepeatCount > 0)
                     {
-                        DrawPanel(new Rect(x, y, 460, 54), "RULE WARNING", $"同じ手：{rm.RepeatAttackType}  {rm.RepeatCount}/{r.repeatCountToViolate}", accent: true);
+                        string body = known
+                            ? $"[{rn}] 同じ手：{rm.RepeatAttackType}  {rm.RepeatCount}/{r.repeatCountToViolate}"
+                            : $"[{rn}] 規約違反が近い：{rm.RepeatCount}/{r.repeatCountToViolate}";
+                        DrawPanel(new Rect(x, y, 460, 54), "RULE WARNING", body, accent: true);
                         y += 60f;
                     }
                 }
@@ -560,9 +604,16 @@ namespace OJikaProto
             var nm = NegotiationManager.Instance;
             if (nm == null || !nm.IsOpen || nm.Current == null) return;
 
+            // Step4：封印儀式（入力ミニゲーム）
+            if (nm.IsSealRitualActive)
+            {
+                DrawSealRitualPanel(nm);
+                return;
+            }
+
             var def = nm.Current;
 
-            float w = 720f, h = 360f;
+            float w = 760f, h = 392f;
             float x = (Screen.width - w) * 0.5f;
             float y = (Screen.height - h) * 0.5f;
 
@@ -572,37 +623,151 @@ namespace OJikaProto
             GUI.Label(new Rect(x + 16, y + 12, w - 32, 24), def.title, _titleStyle);
             GUI.Label(new Rect(x + 16, y + 44, w - 32, 44), def.prompt, _bodyStyle);
 
-            float p = (RunLogManager.Instance != null) ? RunLogManager.Instance.GetNegotiationPenalty() : 0f;
-            int vc = (RunLogManager.Instance != null) ? RunLogManager.Instance.ViolationCount : 0;
-            GUI.Label(new Rect(x + 16, y + 90, w - 32, 20), $"規約違反ペナルティ: -{p:P0}（違反 {vc}回）", _smallStyle);
+            var log = RunLogManager.Instance;
+            int vc = (log != null) ? log.ViolationCount : 0;
+            int hits = (log != null) ? log.PlayerHitCount : 0;
+            float cost01 = (log != null) ? log.GetAdministrativeCost01() : 0f;
+            float insight = (log != null) ? log.GetNegotiationInsightBonus() : 0f;
 
-            float rowY = y + 118f;
+            // Stance
+            string stanceName = nm.CurrentStance switch
+            {
+                NegotiationStance.Firm => "強硬（譲歩なし）",
+                NegotiationStance.Balanced => "標準（小譲歩）",
+                NegotiationStance.Concede => "譲歩（大）",
+                _ => "標準"
+            };
+
+            float stanceCost = nm.GetAdminCostDelta(nm.CurrentStance);
+            int stanceReduce = nm.GetStanceReduction(nm.CurrentStance);
+            int insightReduce = Mathf.FloorToInt(insight / Mathf.Max(0.0001f, NegotiationManager.InsightPerGateReduction));
+
+            GUI.Label(new Rect(x + 16, y + 90, w - 32, 20),
+                $"行政コスト: {cost01:P0}（違反 {vc} / 被弾 {hits}）   学習: +{insight:P0}（条件緩和 -{insightReduce}）",
+                _smallStyle);
+
+            GUI.Label(new Rect(x + 16, y + 110, w - 32, 20),
+                $"取引姿勢: {stanceName}（条件緩和 -{stanceReduce} / 追加コスト +{stanceCost:P0}）  ※Z/Xで変更",
+                _smallStyle);
+
+            float rowY = y + 142f;
             for (int i = 0; i < def.options.Length; i++)
             {
                 var o = def.options[i];
 
-                float baseC, bonus, penalty, finalC;
-                int have, total;
-                nm.TryComputeChance(i, out baseC, out bonus, out penalty, out finalC, out have, out total);
+                int required, have, total, stRed, inRed, finalReq;
+                float adminDelta;
+                bool can;
+                nm.TryComputeGate(i, nm.CurrentStance, out required, out have, out total, out stRed, out inRed, out finalReq, out adminDelta, out can);
 
-                string line = $"{i + 1}. {o.label}   成功率: {finalC:P0}（基本 {baseC:P0} + 証拠 {bonus:P0} - 違反 {penalty:P0}）";
+                string extra = (o.success == NegotiationOutcome.Seal && def.sealRitualEnabled) ? "  [儀式]" : "";
+                string line = $"{i + 1}. {o.label}{extra}   成立条件: {have}/{finalReq}  （必要 {required} -譲歩{stRed} -学習{inRed}）";
                 GUI.Label(new Rect(x + 16, rowY, w - 32, 20), line, _bodyStyle);
 
                 string evText = NegotiationManager.EvidenceListToText(o.evidenceBonusTags);
-                string prog = (total > 0) ? $"  [{have}/{total}]" : "";
-                GUI.Label(new Rect(x + 36, rowY + 20, w - 52, 18), $"有利証拠: {evText}{prog}", _smallStyle);
+                string prog = (total > 0) ? $"  [所持 {have}/{total}]" : "";
+                GUI.Label(new Rect(x + 36, rowY + 20, w - 52, 18), $"条件タグ: {evText}{prog}", _smallStyle);
 
-                rowY += 56f;
+                if (can)
+                    GUI.Label(new Rect(x + w - 140, rowY + 2, 120, 18), "OK", _smallStyle);
+                else
+                    GUI.Label(new Rect(x + w - 140, rowY + 2, 120, 18), "NG", _smallStyle);
+
+                rowY += 62f;
             }
 
-            GUI.Label(new Rect(x + 16, y + h - 30, w - 32, 22), "1/2/3：選択  Esc：閉じる", _smallStyle);
+            // Counter offer
+            if (nm.HasCounterOffer && !string.IsNullOrEmpty(nm.CounterOfferText))
+            {
+                DrawRect(new Rect(x + 12, y + h - 96, w - 24, 66), _panel2);
+                GUI.Label(new Rect(x + 22, y + h - 92, w - 44, 60), nm.CounterOfferText, _smallStyle);
+            }
+
+            GUI.Label(new Rect(x + 16, y + h - 26, w - 32, 22), "1/2/3：選択  Z/X：姿勢  Enter：対案受諾  Esc：閉じる", _smallStyle);
 
             if (Event.current.type == EventType.KeyDown)
             {
+                if (Event.current.keyCode == KeyCode.Z) nm.CycleStance(-1);
+                if (Event.current.keyCode == KeyCode.X) nm.CycleStance(+1);
+
                 if (Event.current.keyCode == KeyCode.Alpha1) nm.Choose(0);
                 if (Event.current.keyCode == KeyCode.Alpha2) nm.Choose(1);
                 if (Event.current.keyCode == KeyCode.Alpha3) nm.Choose(2);
+
+                if (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
+                    nm.AcceptCounterOffer();
+
                 if (Event.current.keyCode == KeyCode.Escape) nm.Close();
+            }
+        }
+
+        private static string ArrowSymbol(KeyCode k)
+        {
+            return k switch
+            {
+                KeyCode.UpArrow => "↑",
+                KeyCode.LeftArrow => "←",
+                KeyCode.DownArrow => "↓",
+                KeyCode.RightArrow => "→",
+                _ => "?"
+            };
+        }
+
+        // Step4：封印は“成立後に儀式入力”を要求し、勝ち方の違いを手触りで見せる
+        private void DrawSealRitualPanel(NegotiationManager nm)
+        {
+            var def = nm.Current;
+
+            float w = 720f, h = 280f;
+            float x = (Screen.width - w) * 0.5f;
+            float y = (Screen.height - h) * 0.5f;
+
+            DrawRect(new Rect(x, y, w, h), _panel);
+            DrawRect(new Rect(x, y, 4, h), _accent);
+
+            GUI.Label(new Rect(x + 16, y + 12, w - 32, 24), "封印儀式", _titleStyle);
+            GUI.Label(new Rect(x + 16, y + 44, w - 32, 22), "↑←↓→ を順番に入力（ミス/時間切れで失敗）", _bodyStyle);
+
+            int len = (nm.SealRitualSequence != null) ? nm.SealRitualSequence.Length : 0;
+            int idx = nm.SealRitualIndex;
+
+            // Sequence display
+            float sx = x + 16f;
+            float sy = y + 92f;
+            float bw = 56f;
+            for (int i = 0; i < len; i++)
+            {
+                var r = new Rect(sx + i * (bw + 8f), sy, bw, 56f);
+                bool isNow = (i == idx);
+                bool isDone = (i < idx);
+
+                Color bg = isDone ? new Color(_accent.r, _accent.g, _accent.b, 0.25f)
+                                  : isNow ? new Color(_accent.r, _accent.g, _accent.b, 0.45f)
+                                          : _panel2;
+                DrawRect(r, bg);
+                DrawRect(new Rect(r.x, r.y, 2, r.height), _accent);
+
+                string s = (nm.SealRitualSequence != null) ? ArrowSymbol(nm.SealRitualSequence[i]) : "?";
+                var st = new GUIStyle(_titleStyle) { alignment = TextAnchor.MiddleCenter, fontSize = 26 };
+                GUI.Label(r, s, st);
+            }
+
+            // Time bar
+            float frac = (nm.SealRitualStepTimeTotal <= 0.0001f) ? 0f : Mathf.Clamp01(nm.SealRitualStepTimeLeft / nm.SealRitualStepTimeTotal);
+            DrawRect(new Rect(x + 16, y + 170, w - 32, 16), _panel2);
+            DrawRect(new Rect(x + 16, y + 170, (w - 32) * frac, 16), _accent);
+            GUI.Label(new Rect(x + 16, y + 192, w - 32, 18), $"進行: {Mathf.Clamp(idx, 0, len)}/{len}", _smallStyle);
+
+            GUI.Label(new Rect(x + 16, y + h - 26, w - 32, 22), "矢印キー：入力   Esc：中断（失敗扱いだが学習が進む）", _smallStyle);
+
+            if (Event.current.type == EventType.KeyDown)
+            {
+                var kc = Event.current.keyCode;
+                if (kc == KeyCode.UpArrow || kc == KeyCode.LeftArrow || kc == KeyCode.DownArrow || kc == KeyCode.RightArrow)
+                    nm.InputSealRitual(kc);
+
+                if (kc == KeyCode.Escape)
+                    nm.AbortSealRitual();
             }
         }
 
@@ -621,14 +786,26 @@ namespace OJikaProto
             float ty = y + 30f;
             GUI.Label(new Rect(x + 12, ty, w - 24, 18), $"被弾回数: {log.PlayerHitCount} / 被ダメージ: {log.PlayerDamageTaken:0}", _bodyStyle);
             ty += 18f;
-            GUI.Label(new Rect(x + 12, ty, w - 24, 18), $"規約違反: {log.ViolationCount} / 交渉ペナルティ: -{log.GetNegotiationPenalty():P0}", _bodyStyle);
+            float cost = log.GetAdministrativeCost01();
+            float ins = log.GetNegotiationInsightBonus();
+            GUI.Label(new Rect(x + 12, ty, w - 24, 18), $"規約違反: {log.ViolationCount} / 行政コスト: {cost:P0} / 学習: +{ins:P0}", _bodyStyle);
             ty += 18f;
 
             int max = 6;
             for (int i = 0; i < log.Violations.Count && i < max; i++)
             {
                 var v = log.Violations[i];
-                GUI.Label(new Rect(x + 12, ty, w - 24, 18), $"- [{v.time:0.0}s] {v.ruleName} ({v.reason})", _smallStyle);
+                string shownName = v.ruleName;
+                string shownReason = v.reason;
+
+                var rm = RuleManager.Instance;
+                if (rm != null && rm.TryGetRuleByName(v.ruleName, out var def))
+                {
+                    shownName = rm.GetPlayerFacingRuleName(def);
+                    shownReason = rm.GetPlayerFacingViolationReason(def, v.reason);
+                }
+
+                GUI.Label(new Rect(x + 12, ty, w - 24, 18), $"- [{v.time:0.0}s] {shownName} ({shownReason})", _smallStyle);
                 ty += 18f;
             }
         }
@@ -651,9 +828,9 @@ namespace OJikaProto
             GUI.Label(new Rect(x + 34, y + 152, w - 68, 18), "CONTROLS", _smallStyle);
             GUI.Label(new Rect(x + 34, y + 178, w - 68, 18), "WASD：移動 / Space：ジャンプ", _bodyStyle);
             GUI.Label(new Rect(x + 34, y + 200, w - 68, 18), "LMB：軽攻撃 / RMB：重攻撃 / E：Seal（崩し強）", _bodyStyle);
-            GUI.Label(new Rect(x + 34, y + 222, w - 68, 18), "Tab：ロックオン（視線規約に注意）", _bodyStyle);
-            GUI.Label(new Rect(x + 34, y + 244, w - 68, 18), "敵がBroken中＆近距離でF：交渉 → 1/2/3で選択", _bodyStyle);
-            GUI.Label(new Rect(x + 34, y + 266, w - 68, 18), "調査：ポイント付近でE（交渉成功率ボーナス）", _bodyStyle);
+            GUI.Label(new Rect(x + 34, y + 222, w - 68, 18), "Tab：ロックオン（規約に注意）", _bodyStyle);
+            GUI.Label(new Rect(x + 34, y + 244, w - 68, 18), "敵がBroken中＆近距離でF：交渉 → 1/2/3で選択（Z/Xで譲歩） / 封印は儀式（矢印キー）", _bodyStyle);
+            GUI.Label(new Rect(x + 34, y + 266, w - 68, 18), "調査：ポイント付近でE（交渉成立条件の証拠）", _bodyStyle);
 
             GUI.Label(new Rect(x + 20, y + h - 86, w - 40, 20), "Enter：START    F5：デモ自動再生    F7/F8：Take", _bodyStyle);
             GUI.Label(new Rect(x + 20, y + h - 60, w - 40, 18), "※難易度選択なし（固定）。規約と判断で“難しさ”が変わる。", _smallStyle);

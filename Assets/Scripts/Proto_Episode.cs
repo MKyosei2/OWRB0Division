@@ -91,6 +91,10 @@ namespace OJikaProto
             IsComplete = false;
             LastOutcome = NegotiationOutcome.None;
             PhaseIndex = 0;
+
+            // ✅ 規約の伏せ字/解析状態を初期化（調査で特定する前提）
+            RuleManager.Instance?.ResetDiscovery();
+            RuleManager.Instance?.ClearRuntime();
             EnterPhase();
         }
 
@@ -141,6 +145,8 @@ namespace OJikaProto
 
                 case EpisodePhaseType.Investigation:
                     InvestigationManager.Instance.ResetForEpisode(p.targetEvidenceCount);
+                    // ✅ 調査開始時に、規約は一旦「？？？」に戻して解析をやり直す
+                    RuleManager.Instance?.ResetDiscovery();
                     break;
 
                 case EpisodePhaseType.Combat:
