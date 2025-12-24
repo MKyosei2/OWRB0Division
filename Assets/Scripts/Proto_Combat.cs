@@ -416,6 +416,24 @@ namespace OJikaProto
         {
             if (_episode == null || _enemy == null) return;
 
+            // Step7: 停戦で得られる暫定許可証がある場合、敵がBrokenでなくても「緊急介入」で交渉を開ける。
+            // ねらい：停戦ルートの次周回メリット＝ショートカットを体験させる。
+            var meta = CaseMetaManager.Instance;
+            if (meta != null && meta.HasArbitrationPass)
+            {
+                if (Input.GetKeyDown(KeyCode.R))
+                {
+                    var nm = NegotiationManager.Instance;
+                    if (nm != null && !nm.IsOpen && _player && Vector3.Distance(_player.position, _enemy.transform.position) <= negotiationRange)
+                    {
+                        // 介入自体はコスト（評価の代償）。パスの消費は「緊急停戦」を選んだ時に行う。
+                        RunLogManager.Instance?.AddAdministrativeCost(0.08f);
+                        EventBus.Instance?.Toast("Emergency Mediation");
+                        nm.Begin(_neg, _episode, _enemyCtrl, this);
+                    }
+                }
+            }
+
             if (Input.GetKeyDown(KeyCode.F) && _enemyBrk != null && _enemyBrk.IsBroken)
             {
                 if (_player && Vector3.Distance(_player.position, _enemy.transform.position) <= negotiationRange)

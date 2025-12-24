@@ -35,6 +35,19 @@ namespace OJikaProto
         public int minEvidenceToSucceed = -1;
 
         public NegotiationOutcome success = NegotiationOutcome.Truce;
+
+        [Header("Step7: Special")]
+        [Tooltip("TRUEなら『緊急停戦（パス消費）』など、メタ要素で追加される特殊オプション。")]
+        public bool isEmergencyOption = false;
+
+        [Tooltip("TRUEなら成功時に CaseMetaManager.arbitrationPasses を1消費する")]
+        public bool consumesArbitrationPass = false;
+
+        [Tooltip("成功時に追加で加算する行政コスト（0..1）")]
+        [Range(0f, 1f)] public float extraAdminCost = 0.35f;
+
+        [Tooltip("成功時に追加で加算する期限（truceDebt）")]
+        [Range(0, 3)] public int extraTruceDebt = 1;
     }
 
     [CreateAssetMenu(menuName = "OJikaProto/NegotiationDefinition", fileName = "NegotiationDefinition_Case01")]
@@ -83,6 +96,11 @@ namespace OJikaProto
         // 学習（Fail Forward）を「条件緩和」に変換：+8%（交渉失敗1回）= -1条件
         public const float InsightPerGateReduction = 0.08f;
 
+        // Step8: 期限/歪みで『書類仕事』が増え、同じ譲歩でも行政コストが上がる
+        // （成功率は上がらないが、代償が増える＝“面倒さ/圧”が見える）
+        public const float BureaucracyMulPerTruceDebt = 0.25f;
+        public const float BureaucracyMulPerDistortion = 0.15f;
+
         public bool IsOpen { get; private set; }
         public NegotiationDefinition Current { get; private set; }
         public float Cooldown { get; private set; }
@@ -110,6 +128,66 @@ namespace OJikaProto
         private NegotiationStance _pendingStance = NegotiationStance.Balanced;
         private float _pendingAdminCostDelta = 0f;
         private float _pendingGate = 0f;
+
+        private void NormalizeEmergencyOptionForMeta()
+        {
+            if (Current == null) return;
+            if (Current.options == null) Current.options = new NegotiationOption[0];
+
+            var meta = CaseMetaManager.Instance;
+            bool hasPass = (meta != null && meta.arbitrationPasses > 0);
+
+            // 1) パスが無ければ、緊急オプションは配列から外す（UIを混乱させない）
+            bool hasEmergency = false;
+            int normalCount = 0;
+            for (int i = 0; i < Current.options.Length; i++)
+            {
+                var o = Current.options[i];
+                if (o == null) continue;
+                if (o.isEmergencyOption) hasEmergency = true;
+                else normalCount++;
+            }
+
+            if (!hasPass && hasEmergency)
+            {
+                var trimmed = new NegotiationOption[normalCount];
+                int w = 0;
+                for (int i = 0; i < Current.options.Length; i++)
+                {
+                    var o = Current.options[i];
+                    if (o == null) continue;
+                    if (o.isEmergencyOption) continue;
+                    trimmed[w++] = o;
+                }
+                Current.options = trimmed;
+                return;
+            }
+
+            if (!hasPass) return;
+
+            // 2) 既に入っているなら何もしない
+            if (hasEmergency) return;
+
+            // 3) 追加
+            var em = new NegotiationOption
+            {
+                label = "緊急停戦（パス消費）",
+                description = "暫定許可証で停戦を強制する（代償：行政コストと期限が増える）",
+                baseChance = 1f,
+                evidenceBonusTags = new EvidenceTag[0],
+                minEvidenceToSucceed = 0,
+                success = NegotiationOutcome.Truce,
+                isEmergencyOption = true,
+                consumesArbitrationPass = true,
+                extraAdminCost = 0.35f,
+                extraTruceDebt = 1,
+            };
+
+            var ext = new NegotiationOption[Current.options.Length + 1];
+            for (int i = 0; i < Current.options.Length; i++) ext[i] = Current.options[i];
+            ext[ext.Length - 1] = em;
+            Current.options = ext;
+        }
 
         private void Update()
         {
@@ -140,6 +218,9 @@ namespace OJikaProto
             CurrentStance = NegotiationStance.Balanced;
             ClearCounterOffer();
             ClearSealRitual();
+
+            // Step7: 停戦の次周回メリット（暫定許可証）に応じて、緊急オプションを増減
+            NormalizeEmergencyOptionForMeta();
 
             FeedbackManager.Instance?.OnNegotiationOpen();
             EventBus.Instance?.Toast("Negotiation Open");
@@ -312,15 +393,27 @@ namespace OJikaProto
             ClearCounterOffer();
         }
 
+        public float GetBureaucracyCostMultiplier()
+        {
+            var meta = CaseMetaManager.Instance;
+            if (meta == null) return 1f;
+            return 1f
+                   + BureaucracyMulPerTruceDebt * Mathf.Clamp(meta.truceDebt, 0, 3)
+                   + BureaucracyMulPerDistortion * Mathf.Clamp(meta.distortion, 0, 3);
+        }
+
         public float GetAdminCostDelta(NegotiationStance stance)
         {
-            return stance switch
+            float baseCost = stance switch
             {
                 NegotiationStance.Firm => 0f,
                 NegotiationStance.Balanced => BalancedAdminCost,
                 NegotiationStance.Concede => ConcedeAdminCost,
                 _ => 0f
             };
+
+            // Step8: 期限/歪みで同じ譲歩でも“書類コスト”が重くなる
+            return Mathf.Clamp01(baseCost * GetBureaucracyCostMultiplier());
         }
 
         public int GetStanceReduction(NegotiationStance stance)
@@ -477,6 +570,43 @@ namespace OJikaProto
 
             if (canSucceed)
             {
+                // Step7: 暫定許可証を使う『緊急停戦』
+                // - 条件0で成立する代わりに、行政コストと期限が増える
+                // - 成功時にパスを1消費する
+                if (opt.isEmergencyOption)
+                {
+                    bool ok = true;
+                    var meta = CaseMetaManager.Instance;
+                    if (opt.consumesArbitrationPass)
+                        ok = (meta != null && meta.ConsumeArbitrationPass());
+
+                    if (!ok)
+                    {
+                        EventBus.Instance?.Toast("No Arbitration Pass");
+                        FeedbackManager.Instance?.OnNegotiationFail();
+                        Close();
+                        return;
+                    }
+
+                    // Step8: 監査/歪みが強いほど緊急手続きのコストが跳ね上がる
+                    float mul = GetBureaucracyCostMultiplier();
+                    float extraCost = Mathf.Clamp01(opt.extraAdminCost * mul);
+                    float totalCost = Mathf.Clamp01(adminCostDelta + extraCost);
+
+                    RunLogManager.Instance?.LogNegotiation(opt.label, gate, true);
+                    RunLogManager.Instance?.AddAdministrativeCost(totalCost);
+
+                    int extraDebt = Mathf.Clamp(opt.extraTruceDebt, 0, 3);
+                    if (extraDebt > 0 && meta != null) meta.AddTruceDebt(extraDebt);
+
+                    FeedbackManager.Instance?.OnNegotiationSuccess();
+                    EventBus.Instance?.Toast($"Emergency Truce  (Cost +{totalCost:P0})");
+
+                    _director?.ResolveByNegotiation(opt.success);
+                    Close();
+                    return;
+                }
+
                 // Step4：封印だけは“成立後に儀式”を要求（運ゲー排除・手触り付与）
                 if (opt.success == NegotiationOutcome.Seal && Current.sealRitualEnabled)
                 {

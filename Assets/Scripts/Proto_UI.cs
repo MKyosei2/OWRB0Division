@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace OJikaProto
 {
@@ -472,7 +472,11 @@ namespace OJikaProto
             if (enemy == null) return;
 
             var brk = enemy.GetComponent<Breakable>();
-            if (brk == null || !brk.IsBroken) return;
+            bool canNormal = (brk != null && brk.IsBroken);
+
+            var meta = CaseMetaManager.Instance;
+            bool canEmergency = (meta != null && meta.HasArbitrationPass);
+            if (!canNormal && !canEmergency) return;
 
             var pc = FindObjectOfType<PlayerController>();
             if (pc == null) return;
@@ -492,7 +496,10 @@ namespace OJikaProto
             DrawRect(new Rect(r.x, r.y, 4, r.height), _accent);
 
             GUI.Label(new Rect(r.x + 14, r.y + 10, r.width - 28, 22), "NEGOTIATION AVAILABLE", _smallStyle);
-            GUI.Label(new Rect(r.x + 14, r.y + 28, r.width - 28, 22), "F：交渉を開始（1 / 2 / 3 で選択）", _bodyStyle);
+            string line = canNormal
+                ? (canEmergency ? "F：交渉（Broken）  /  R：緊急介入（許可証）  /  1-4：選択" : "F：交渉を開始（1-3：選択）")
+                : "R：緊急介入（許可証）  /  1-4：選択";
+            GUI.Label(new Rect(r.x + 14, r.y + 28, r.width - 28, 22), line, _bodyStyle);
         }
 
         // -------------------- Rules / Warnings --------------------
@@ -537,19 +544,29 @@ namespace OJikaProto
                 rulesH = 28f + rm.activeRules.Count * 18f + 8f;
 
             float ry = 12f + rulesH + 8f;
-            Rect r = new Rect(rx, ry, 360f, 66f);
+            Rect r = new Rect(rx, ry, 360f, 86f);
             DrawRect(r, _panel);
             DrawRect(new Rect(r.x, r.y, 4, r.height), new Color(0.95f, 0.35f, 0.35f, 1f));
 
             GUI.Label(new Rect(r.x + 12, r.y + 8, r.width - 24, 18), "潜入（Security）", _smallStyle);
 
+            var meta = CaseMetaManager.Instance;
             string line1 = $"ALERT: {(inf.alert01 * 100f):0}%";
             string line2 = inf.IsLockdownActive
                 ? $"LOCKDOWN: {inf.LockdownRemaining:0.0}s（この間、Eで証拠回収不可）"
                 : "カメラ視界を避けてEで証拠回収（見つかるとLOCKDOWN）";
 
+            string sec = (meta != null)
+                ? $"監視 x{meta.GetSecurityMultiplier():0.0}  / 期限 {meta.truceDebt}  歪み {meta.distortion}"
+                : "監視 x1.0";
+
+            string audit = inf.IsAuditActive
+                ? $"AUDIT: ACTIVE {inf.AuditRemaining:0.0}s"
+                : $"AUDIT in {inf.AuditNextIn:0.0}s";
+
             GUI.Label(new Rect(r.x + 12, r.y + 26, r.width - 24, 18), line1, _bodyStyle);
             GUI.Label(new Rect(r.x + 12, r.y + 44, r.width - 24, 18), line2, _smallStyle);
+            GUI.Label(new Rect(r.x + 12, r.y + 62, r.width - 24, 18), $"{sec}  /  {audit}", _smallStyle);
         }
 
 
@@ -574,7 +591,8 @@ namespace OJikaProto
 
                 if (r.ruleType == RuleType.GazeProhibition)
                 {
-                    float remain = Mathf.Max(0f, r.gazeSecondsToViolate - rm.GazeTimerSeconds);
+                    float limit = rm.GetEffectiveGazeSecondsToViolate(r);
+                    float remain = Mathf.Max(0f, limit - rm.GazeTimerSeconds);
                     if (rm.GazeTimerSeconds > 0.05f)
                     {
                         string body = known
@@ -588,9 +606,10 @@ namespace OJikaProto
                 {
                     if (rm.RepeatWindowSeconds > 0.01f && rm.RepeatCount > 0)
                     {
+                        int limitCount = rm.GetEffectiveRepeatCountToViolate(r);
                         string body = known
-                            ? $"[{rn}] 同じ手：{rm.RepeatAttackType}  {rm.RepeatCount}/{r.repeatCountToViolate}"
-                            : $"[{rn}] 規約違反が近い：{rm.RepeatCount}/{r.repeatCountToViolate}";
+                            ? $"[{rn}] 同じ手：{rm.RepeatAttackType}  {rm.RepeatCount}/{limitCount}"
+                            : $"[{rn}] 規約違反が近い：{rm.RepeatCount}/{limitCount}";
                         DrawPanel(new Rect(x, y, 460, 54), "RULE WARNING", body, accent: true);
                         y += 60f;
                     }
@@ -642,8 +661,9 @@ namespace OJikaProto
             int stanceReduce = nm.GetStanceReduction(nm.CurrentStance);
             int insightReduce = Mathf.FloorToInt(insight / Mathf.Max(0.0001f, NegotiationManager.InsightPerGateReduction));
 
+            float bmul = nm.GetBureaucracyCostMultiplier();
             GUI.Label(new Rect(x + 16, y + 90, w - 32, 20),
-                $"行政コスト: {cost01:P0}（違反 {vc} / 被弾 {hits}）   学習: +{insight:P0}（条件緩和 -{insightReduce}）",
+                $"行政コスト: {cost01:P0}（違反 {vc} / 被弾 {hits}）   学習: +{insight:P0}（条件緩和 -{insightReduce}）   監査補正 x{bmul:0.00}",
                 _smallStyle);
 
             GUI.Label(new Rect(x + 16, y + 110, w - 32, 20),
@@ -661,7 +681,7 @@ namespace OJikaProto
                 nm.TryComputeGate(i, nm.CurrentStance, out required, out have, out total, out stRed, out inRed, out finalReq, out adminDelta, out can);
 
                 string extra = (o.success == NegotiationOutcome.Seal && def.sealRitualEnabled) ? "  [儀式]" : "";
-                string line = $"{i + 1}. {o.label}{extra}   成立条件: {have}/{finalReq}  （必要 {required} -譲歩{stRed} -学習{inRed}）";
+                string line = $"{i + 1}. {o.label}{extra}   成立条件: {have}/{finalReq}  （必要 {required} -譲歩{stRed} -学習{inRed}）   コスト +{adminDelta:P0}";
                 GUI.Label(new Rect(x + 16, rowY, w - 32, 20), line, _bodyStyle);
 
                 string evText = NegotiationManager.EvidenceListToText(o.evidenceBonusTags);
@@ -683,16 +703,18 @@ namespace OJikaProto
                 GUI.Label(new Rect(x + 22, y + h - 92, w - 44, 60), nm.CounterOfferText, _smallStyle);
             }
 
-            GUI.Label(new Rect(x + 16, y + h - 26, w - 32, 22), "1/2/3：選択  Z/X：姿勢  Enter：対案受諾  Esc：閉じる", _smallStyle);
+            string keySpan = def.options.Length >= 4 ? "1-4" : "1-3";
+            GUI.Label(new Rect(x + 16, y + h - 26, w - 32, 22), $"{keySpan}：選択  Z/X：姿勢  Enter：対案受諾  Esc：閉じる", _smallStyle);
 
             if (Event.current.type == EventType.KeyDown)
             {
                 if (Event.current.keyCode == KeyCode.Z) nm.CycleStance(-1);
                 if (Event.current.keyCode == KeyCode.X) nm.CycleStance(+1);
 
-                if (Event.current.keyCode == KeyCode.Alpha1) nm.Choose(0);
-                if (Event.current.keyCode == KeyCode.Alpha2) nm.Choose(1);
-                if (Event.current.keyCode == KeyCode.Alpha3) nm.Choose(2);
+                if (Event.current.keyCode == KeyCode.Alpha1 && def.options.Length >= 1) nm.Choose(0);
+                if (Event.current.keyCode == KeyCode.Alpha2 && def.options.Length >= 2) nm.Choose(1);
+                if (Event.current.keyCode == KeyCode.Alpha3 && def.options.Length >= 3) nm.Choose(2);
+                if (Event.current.keyCode == KeyCode.Alpha4 && def.options.Length >= 4) nm.Choose(3);
 
                 if (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
                     nm.AcceptCounterOffer();
@@ -824,13 +846,18 @@ namespace OJikaProto
             GUI.Label(new Rect(x + 20, y + 54, w - 40, 24), flow.subtitle, _bodyStyle);
             GUI.Label(new Rect(x + 20, y + 84, w - 40, 44), flow.conceptLine, _bodyStyle);
 
-            DrawRect(new Rect(x + 20, y + 140, w - 40, 190), _panel2);
+            var meta = CaseMetaManager.Instance;
+            string carry = (meta != null) ? meta.GetCarryoverText() : "（メタ未生成）";
+            GUI.Label(new Rect(x + 20, y + 118, w - 40, 18), $"CARRYOVER : {carry}", _smallStyle);
+
+            DrawRect(new Rect(x + 20, y + 140, w - 40, 214), _panel2);
             GUI.Label(new Rect(x + 34, y + 152, w - 68, 18), "CONTROLS", _smallStyle);
             GUI.Label(new Rect(x + 34, y + 178, w - 68, 18), "WASD：移動 / Space：ジャンプ", _bodyStyle);
             GUI.Label(new Rect(x + 34, y + 200, w - 68, 18), "LMB：軽攻撃 / RMB：重攻撃 / E：Seal（崩し強）", _bodyStyle);
             GUI.Label(new Rect(x + 34, y + 222, w - 68, 18), "Tab：ロックオン（規約に注意）", _bodyStyle);
             GUI.Label(new Rect(x + 34, y + 244, w - 68, 18), "敵がBroken中＆近距離でF：交渉 → 1/2/3で選択（Z/Xで譲歩） / 封印は儀式（矢印キー）", _bodyStyle);
             GUI.Label(new Rect(x + 34, y + 266, w - 68, 18), "調査：ポイント付近でE（交渉成立条件の証拠）", _bodyStyle);
+            GUI.Label(new Rect(x + 34, y + 288, w - 68, 18), "Q（契約時）：影の遮蔽（監視のRayを遮る）", _bodyStyle);
 
             GUI.Label(new Rect(x + 20, y + h - 86, w - 40, 20), "Enter：START    F5：デモ自動再生    F7/F8：Take", _bodyStyle);
             GUI.Label(new Rect(x + 20, y + h - 60, w - 40, 18), "※難易度選択なし（固定）。規約と判断で“難しさ”が変わる。", _smallStyle);
@@ -850,6 +877,11 @@ namespace OJikaProto
 
             GUI.Label(new Rect(x + 20, y + 18, w - 40, 26), "EPISODE COMPLETE", _titleStyle);
             GUI.Label(new Rect(x + 20, y + 52, w - 40, 22), $"結果：{OutcomeText(flow.LastOutcome)}", _bodyStyle);
+
+            var meta = CaseMetaManager.Instance;
+            string carry = (meta != null) ? meta.GetCarryoverText() : "（メタ未生成）";
+            GUI.Label(new Rect(x + 20, y + 78, w - 40, 18), $"次回引き継ぎ：{carry}", _smallStyle);
+            GUI.Label(new Rect(x + 20, y + 102, w - 40, 90), flow.nextHookLine, _bodyStyle);
 
             GUI.Label(new Rect(x + 20, y + h - 46, w - 40, 22), "R：やり直す    T：タイトルへ戻る", _bodyStyle);
 

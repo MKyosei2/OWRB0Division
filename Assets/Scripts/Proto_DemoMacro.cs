@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 namespace OJikaProto
@@ -177,6 +177,7 @@ namespace OJikaProto
             float cost = (log != null) ? log.GetAdministrativeCost01() : 0f;
             float ins = (log != null) ? log.GetNegotiationInsightBonus() : 0f;
             string outcome = (flow != null) ? flow.LastOutcome.ToString() : "Unknown";
+            string carry = (CaseMetaManager.Instance != null) ? CaseMetaManager.Instance.GetCarryoverText() : "（メタ未生成）";
 
             // 交渉の成立条件（証拠＋譲歩＋学習で緩和）
             string chances = "";
@@ -199,6 +200,7 @@ namespace OJikaProto
 
             return
                 $"OUTCOME : {outcome}\n" +
+                $"CARRYOVER : {carry}\n" +
                 $"VIOLATION : {vio}   COST : {cost:P0}   LEARN : +{ins:P0}\n" +
                 $"PLAYER : HIT {hits}   DMG {dmg:0}\n\n" +
                 $"NEGOTIATION GATES\n{chances}\n" +

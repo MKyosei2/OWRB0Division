@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -167,6 +167,8 @@ public static class CoreEnsure
             Ensure<InvestigationManager>("InvestigationManager");
             Ensure<RuleManager>("RuleManager");
             Ensure<NegotiationManager>("NegotiationManager");
+            Ensure<InfiltrationManager>("InfiltrationManager");
+            Ensure<CaseMetaManager>("CaseMetaManager");
         }
 
         private static void Ensure<T>(string name) where T : Component

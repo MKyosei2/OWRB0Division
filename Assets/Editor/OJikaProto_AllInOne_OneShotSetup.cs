@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -32,10 +32,11 @@ namespace OJikaProto.EditorTools
             new GameObject("EventBus").AddComponent<OJikaProto.EventBus>();
             new GameObject("RunLogManager").AddComponent<OJikaProto.RunLogManager>();
             new GameObject("InvestigationManager").AddComponent<OJikaProto.InvestigationManager>();
-            new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
 
             var ruleMgr = new GameObject("RuleManager").AddComponent<OJikaProto.RuleManager>();
             new GameObject("NegotiationManager").AddComponent<OJikaProto.NegotiationManager>();
+            new GameObject("CaseMetaManager").AddComponent<OJikaProto.CaseMetaManager>();
+            new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
 
             // ----- Ground -----
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -64,6 +65,7 @@ namespace OJikaProto.EditorTools
             player.AddComponent<OJikaProto.PlayerHealth>();
             var pCombat = player.AddComponent<OJikaProto.PlayerCombat>();
             var lockOn = player.AddComponent<OJikaProto.LockOnController>();
+            player.AddComponent<OJikaProto.ContractBoonAbility>();
 
             // ----- Camera -----
             Camera cam = Camera.main;
@@ -154,6 +156,11 @@ namespace OJikaProto.EditorTools
                     r.displayName = "視線を合わせるな";
                     r.gazeSecondsToViolate = 3.0f;
                     r.feedbackIntensity = 0.85f;
+                    r.startHidden = true;
+                    r.hiddenLabel = "？？？";
+                    r.hintText = "（視線/監視の気配）";
+                    r.confirmPointsRequired = 2;
+                    r.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid };
                     return r;
                 });
 
@@ -167,8 +174,28 @@ namespace OJikaProto.EditorTools
                     r.repeatCountToViolate = 3;
                     r.repeatWindowSeconds = 2.0f;
                     r.feedbackIntensity = 0.85f;
+                    r.startHidden = true;
+                    r.hiddenLabel = "？？？";
+                    r.hintText = "（反復/時計の違和感）";
+                    r.confirmPointsRequired = 2;
+                    r.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop, OJikaProto.EvidenceTag.Clock_DeviceHint };
                     return r;
                 });
+
+            // Step1: 規約は調査で特定（伏せ字＋解析）
+            ruleGaze.startHidden = true;
+            ruleGaze.hiddenLabel = "？？？";
+            ruleGaze.hintText = "（視線/監視の気配）";
+            ruleGaze.confirmPointsRequired = 2;
+            ruleGaze.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid };
+            EditorUtility.SetDirty(ruleGaze);
+
+            ruleRepeat.startHidden = true;
+            ruleRepeat.hiddenLabel = "？？？";
+            ruleRepeat.hintText = "（反復/時計の違和感）";
+            ruleRepeat.confirmPointsRequired = 2;
+            ruleRepeat.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop, OJikaProto.EvidenceTag.Clock_DeviceHint };
+            EditorUtility.SetDirty(ruleRepeat);
 
             // RuleManagerへ登録（初期ルール）
             ruleMgr.activeRules.Clear();
@@ -180,9 +207,9 @@ namespace OJikaProto.EditorTools
             ip1.name = "InvestigationPoint_A";
             ip1.transform.position = new Vector3(-2, 0.5f, -1);
             ApplyColor(ip1, new Color(0.95f, 0.85f, 0.25f, 1f));
-            var ip1Comp = ip1.AddComponent<OJikaProto.InvestigationPoint>();
-            ip1Comp.evidenceTag = OJikaProto.EvidenceTag.CCTV_Loop;
-            ip1Comp.requiresInfiltration = true;
+            var ip1p = ip1.AddComponent<OJikaProto.InvestigationPoint>();
+            ip1p.evidenceTag = OJikaProto.EvidenceTag.CCTV_Loop;
+            ip1p.requiresInfiltration = true;
 
             var ip2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ip2.name = "InvestigationPoint_B";
@@ -190,34 +217,33 @@ namespace OJikaProto.EditorTools
             ApplyColor(ip2, new Color(0.25f, 0.95f, 0.55f, 1f));
             ip2.AddComponent<OJikaProto.InvestigationPoint>().evidenceTag = OJikaProto.EvidenceTag.Clock_DeviceHint;
 
-            // ----- Infiltration Mini-Game (Representative Investigation Action) -----
-            // 1つだけでも「捜査＝操作体験」を見せる：カメラ視界を避けて証拠回収
-            var cover = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            cover.name = "CoverPillar";
-            cover.transform.position = new Vector3(-1.0f, 1.0f, -2.2f);
-            cover.transform.localScale = new Vector3(0.7f, 2.0f, 0.7f);
-            ApplyColor(cover, new Color(0.35f, 0.35f, 0.35f, 1f));
-
+            // ----- Security Cameras (Step5) -----
             var camA = new GameObject("SecurityCamera_A");
-            camA.transform.position = new Vector3(-2.0f, 2.2f, -6.0f);
-            camA.transform.rotation = Quaternion.Euler(0, 0, 0);
+            camA.transform.position = new Vector3(-3.5f, 2.2f, -0.2f);
+            camA.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
+            var coneA = camA.AddComponent<OJikaProto.SecurityCameraCone>();
+            coneA.head = camA.transform;
+            coneA.viewDistance = 8f;
+            coneA.viewAngle = 80f;
+            coneA.reason = "Camera A";
+            coneA.seenIntensity01 = 1f;
 
-            // 見た目（小さな筐体）
-            var camVis = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            camVis.name = "CameraBody";
-            camVis.transform.SetParent(camA.transform);
-            camVis.transform.localPosition = Vector3.zero;
-            camVis.transform.localRotation = Quaternion.identity;
-            camVis.transform.localScale = new Vector3(0.30f, 0.20f, 0.50f);
-            ApplyColor(camVis, new Color(0.85f, 0.20f, 0.20f, 1f));
+            var camB = new GameObject("SecurityCamera_B");
+            camB.transform.position = new Vector3(3.5f, 2.2f, -0.2f);
+            camB.transform.rotation = Quaternion.Euler(0f, -45f, 0f);
+            var coneB = camB.AddComponent<OJikaProto.SecurityCameraCone>();
+            coneB.head = camB.transform;
+            coneB.viewDistance = 7f;
+            coneB.viewAngle = 75f;
+            coneB.reason = "Camera B";
+            coneB.seenIntensity01 = 0.9f;
 
-            var cone = camA.AddComponent<OJikaProto.SecurityCameraCone>();
-            cone.viewDistance = 9f;
-            cone.viewAngle = 80f;
-            cone.sweepAngle = 120f;
-            cone.sweepSpeed = 1.6f;
-            cone.reason = "Station CCTV";
-
+            // 遮蔽物（影の遮蔽/Qの効果が分かりやすいよう、柱も置く）
+            var pillar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pillar.name = "Pillar";
+            pillar.transform.position = new Vector3(-2.6f, 1.0f, -0.5f);
+            pillar.transform.localScale = new Vector3(0.5f, 1.0f, 0.5f);
+            ApplyColor(pillar, new Color(0.18f, 0.18f, 0.20f, 1f));
 
             // ----- EpisodeController -----
             var ec = new GameObject("EpisodeController").AddComponent<OJikaProto.EpisodeController>();
@@ -314,6 +340,17 @@ namespace OJikaProto.EditorTools
             neg.options[0].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop };
             neg.options[1].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid, OJikaProto.EvidenceTag.Clock_DeviceHint };
             neg.options[2].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.TicketGate_MemoryLoss, OJikaProto.EvidenceTag.Clock_DeviceHint };
+
+            // Step3: 成立条件（最低証拠数）
+            neg.options[0].minEvidenceToSucceed = 1;
+            neg.options[1].minEvidenceToSucceed = 2;
+            neg.options[2].minEvidenceToSucceed = 2;
+
+            // Step4: 封印は儀式（入力ミニゲーム）
+            neg.sealRitualEnabled = true;
+            neg.sealRitualSteps = 4;
+            neg.sealStepTimeSeconds = 1.1f;
+            neg.sealFailAdminCost = 0.06f;
         }
 
         private static void ApplyColor(GameObject go, Color c)

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace OJikaProto
 {
@@ -161,6 +161,7 @@ namespace OJikaProto
         public void OnCombatResolved(NegotiationOutcome outcome)
         {
             LastOutcome = outcome;
+            CaseMetaManager.Instance?.ApplyOutcome(outcome);
             EventBus.Instance?.Toast($"Resolved: {outcome}");
             NextPhase();
         }
