@@ -9,6 +9,7 @@ namespace OJikaProto.EditorTools
     public static class OJikaProto_AllInOne_OneShotSetup
     {
         private const string AssetDir = "Assets/OJikaProtoAssets";
+        private const string ScenePath = "Assets/OJikaProtoAssets/Proto_Case01.unity"; // 自動保存先（不要なら後述のSaveをコメントアウト）
 
         [MenuItem("Tools/OJikaProto/ALL-IN-ONE One Shot Setup (Rebuild Scene)")]
         public static void RebuildScene()
@@ -30,13 +31,16 @@ namespace OJikaProto.EditorTools
 
             // ----- Core managers -----
             new GameObject("EventBus").AddComponent<OJikaProto.EventBus>();
-            new GameObject("RunLogManager").AddComponent<OJikaProto.RunLogManager>();
-            new GameObject("InvestigationManager").AddComponent<OJikaProto.InvestigationManager>();
 
-            var ruleMgr = new GameObject("RuleManager").AddComponent<OJikaProto.RuleManager>();
-            new GameObject("NegotiationManager").AddComponent<OJikaProto.NegotiationManager>();
-            new GameObject("CaseMetaManager").AddComponent<OJikaProto.CaseMetaManager>();
-            new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
+            var runLogMgr = new GameObject("RunLogManager").AddComponent<OJikaProto.RunLogManager>();
+            var invMgr    = new GameObject("InvestigationManager").AddComponent<OJikaProto.InvestigationManager>();
+            var ruleMgr   = new GameObject("RuleManager").AddComponent<OJikaProto.RuleManager>();
+            var negoMgr   = new GameObject("NegotiationManager").AddComponent<OJikaProto.NegotiationManager>();
+            var metaMgr   = new GameObject("CaseMetaManager").AddComponent<OJikaProto.CaseMetaManager>();
+            var infilMgr  = new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
+
+            // ✅ 競合回避：デモ操作と被りやすいのでメタリセットはF12に固定
+            metaMgr.debugResetKey = KeyCode.F12;
 
             // ----- Ground -----
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -61,11 +65,23 @@ namespace OJikaProto.EditorTools
             if (primCol) Object.DestroyImmediate(primCol);
 
             player.AddComponent<CharacterController>();
+
             var pc = player.AddComponent<OJikaProto.PlayerController>();
-            player.AddComponent<OJikaProto.PlayerHealth>();
+            var pHp = player.AddComponent<OJikaProto.PlayerHealth>();
             var pCombat = player.AddComponent<OJikaProto.PlayerCombat>();
             var lockOn = player.AddComponent<OJikaProto.LockOnController>();
             player.AddComponent<OJikaProto.ContractBoonAbility>();
+
+            // ✅ プロト向け初期値（必要ならここを調整）
+            pc.moveSpeed = 5.5f;
+            pc.jumpSpeed = 6.0f;
+            pc.gravity   = -25f;
+
+            pCombat.lightDamage = 12f;
+            pCombat.heavyDamage = 22f;
+            pCombat.sealDamage  = 6f;
+
+            lockOn.range = 12f;
 
             // ----- Camera -----
             Camera cam = Camera.main;
@@ -80,13 +96,15 @@ namespace OJikaProto.EditorTools
             cam.gameObject.name = "Main Camera";
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.03f, 0.03f, 0.04f, 1f);
+            cam.transform.position = new Vector3(0f, 2.5f, -6.5f);
+            cam.transform.rotation = Quaternion.Euler(15f, 0f, 0f);
 
             // 追従リグ
             var rig = cam.GetComponent<OJikaProto.ThirdPersonCameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<OJikaProto.ThirdPersonCameraRig>();
             rig.target = player.transform;
 
-            // デモ用カット割り（存在する場合のみ）
+            // デモ用カット割り
             if (cam.GetComponent<OJikaProto.Proto_CameraDirector>() == null)
                 cam.gameObject.AddComponent<OJikaProto.Proto_CameraDirector>();
 
@@ -96,18 +114,18 @@ namespace OJikaProto.EditorTools
 
             // ----- HUD -----
             var hud = new GameObject("HUD");
-            hud.AddComponent<OJikaProto.DebugHUD>();
 
-            // ✅ 重要：FeedbackManager は Proto_Feedback.cs 内で実装されているが、
-            // クラス名/名前空間は OJikaProto.FeedbackManager なのでここはこれでOK
+            // UI/HUD
+            var debugHud = hud.AddComponent<OJikaProto.DebugHUD>();
             hud.AddComponent<OJikaProto.FeedbackManager>();
-
             hud.AddComponent<OJikaProto.SubtitleManager>();
+
+            // デモ操作
             hud.AddComponent<OJikaProto.Proto_DebugTools>();
             hud.AddComponent<OJikaProto.Proto_DemoMacro>();
             hud.AddComponent<OJikaProto.Proto_AutoPilot>();
 
-            // ✅ 録画向けHUD + ガード
+            // 録画向けHUD + ガード
             hud.AddComponent<OJikaProto.Proto_CaptureHUD>();
             hud.AddComponent<OJikaProto.Proto_CaptureGuard>();
 
@@ -182,25 +200,11 @@ namespace OJikaProto.EditorTools
                     return r;
                 });
 
-            // Step1: 規約は調査で特定（伏せ字＋解析）
-            ruleGaze.startHidden = true;
-            ruleGaze.hiddenLabel = "？？？";
-            ruleGaze.hintText = "（視線/監視の気配）";
-            ruleGaze.confirmPointsRequired = 2;
-            ruleGaze.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid };
-            EditorUtility.SetDirty(ruleGaze);
-
-            ruleRepeat.startHidden = true;
-            ruleRepeat.hiddenLabel = "？？？";
-            ruleRepeat.hintText = "（反復/時計の違和感）";
-            ruleRepeat.confirmPointsRequired = 2;
-            ruleRepeat.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop, OJikaProto.EvidenceTag.Clock_DeviceHint };
-            EditorUtility.SetDirty(ruleRepeat);
-
             // RuleManagerへ登録（初期ルール）
             ruleMgr.activeRules.Clear();
             ruleMgr.activeRules.Add(ruleGaze);
             ruleMgr.activeRules.Add(ruleRepeat);
+            EditorUtility.SetDirty(ruleMgr);
 
             // ----- Investigation points -----
             var ip1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -217,7 +221,7 @@ namespace OJikaProto.EditorTools
             ApplyColor(ip2, new Color(0.25f, 0.95f, 0.55f, 1f));
             ip2.AddComponent<OJikaProto.InvestigationPoint>().evidenceTag = OJikaProto.EvidenceTag.Clock_DeviceHint;
 
-            // ----- Security Cameras (Step5) -----
+            // ----- Security Cameras -----
             var camA = new GameObject("SecurityCamera_A");
             camA.transform.position = new Vector3(-3.5f, 2.2f, -0.2f);
             camA.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
@@ -238,7 +242,7 @@ namespace OJikaProto.EditorTools
             coneB.reason = "Camera B";
             coneB.seenIntensity01 = 0.9f;
 
-            // 遮蔽物（影の遮蔽/Qの効果が分かりやすいよう、柱も置く）
+            // ----- Pillar (cover) -----
             var pillar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pillar.name = "Pillar";
             pillar.transform.position = new Vector3(-2.6f, 1.0f, -0.5f);
@@ -253,17 +257,30 @@ namespace OJikaProto.EditorTools
 
             // ----- Flow -----
             var flow = new GameObject("GameFlow").AddComponent<OJikaProto.GameFlowController>();
+
+            // ✅ ここが「Inspector設定」：参照を確実に全部つなぐ
+            flow.gameTitle = "OJI-KA";
+            flow.subtitle = "CASE 01 : 終電のいない駅";
+            flow.conceptLine = "“規約”が戦闘ルールを変える / 調査が交渉を変える";
+
             flow.episode = ec;
             flow.player = pc;
             flow.playerCombat = pCombat;
             flow.lockOn = lockOn;
             flow.cameraRig = rig;
 
-            // 保存
+            // ついで：プレイヤーがカメラ参照を持っていない場合の保険
+            if (pc.cameraRoot == null && Camera.main != null) pc.cameraRoot = Camera.main.transform;
+
+            // ----- Save assets + scene -----
             AssetDatabase.SaveAssets();
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
-            Debug.Log("OJikaProto: ALL-IN-ONE One Shot Setup completed. Press Play.");
+            // ✅ シーンを一度保存（不要ならこの2行をコメントアウト）
+            if (!AssetDatabase.IsValidFolder(AssetDir)) EnsureFolder(AssetDir);
+            EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), ScenePath);
+
+            Debug.Log("OJikaProto: ALL-IN-ONE One Shot Setup completed. Scene rebuilt + wired. Press Play.");
         }
 
         // ---------- helpers ----------
@@ -310,7 +327,6 @@ namespace OJikaProto.EditorTools
 
         private static void EnsureNegotiationDefaults(OJikaProto.NegotiationDefinition neg)
         {
-            // optionsが未設定なら最低3択を生成
             if (neg.options == null || neg.options.Length < 3)
             {
                 neg.options = new OJikaProto.NegotiationOption[3]
@@ -336,17 +352,14 @@ namespace OJikaProto.EditorTools
                 };
             }
 
-            // 有利証拠のサンプル
             neg.options[0].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop };
             neg.options[1].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid, OJikaProto.EvidenceTag.Clock_DeviceHint };
             neg.options[2].evidenceBonusTags = new[] { OJikaProto.EvidenceTag.TicketGate_MemoryLoss, OJikaProto.EvidenceTag.Clock_DeviceHint };
 
-            // Step3: 成立条件（最低証拠数）
             neg.options[0].minEvidenceToSucceed = 1;
             neg.options[1].minEvidenceToSucceed = 2;
             neg.options[2].minEvidenceToSucceed = 2;
 
-            // Step4: 封印は儀式（入力ミニゲーム）
             neg.sealRitualEnabled = true;
             neg.sealRitualSteps = 4;
             neg.sealStepTimeSeconds = 1.1f;

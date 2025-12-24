@@ -70,6 +70,7 @@ namespace OJikaProto
         {
             LastOutcome = NegotiationOutcome.None;
             SetState(FlowState.Playing);
+            RunLogManager.Instance?.StartRun();
             if (episode != null) episode.BeginEpisode();
         }
 
@@ -77,6 +78,7 @@ namespace OJikaProto
         {
             LastOutcome = NegotiationOutcome.None;
             SetState(FlowState.Playing);
+            RunLogManager.Instance?.StartRun();
             if (episode != null) episode.BeginEpisode();
         }
 

@@ -12,12 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5ae755b74942d9b40bd1f54748557c80, type: 3}
   m_Name: Rule_Gaze
   m_EditorClassIdentifier: 
-  ruleType: 1
+  ruleType: 0
   displayName: "\u8996\u7DDA\u3092\u5408\u308F\u305B\u308B\u306A"
-  description: "\u30ED\u30C3\u30AF\u30AA\u30F3\u3092\u7DAD\u6301\u3057\u904E\u304E\u308B\u3068\u9055\u53CD\u3002"
+  feedbackIntensity: 0.85
+  startHidden: 1
+  hiddenLabel: "\uFF1F\uFF1F\uFF1F"
+  hintText: "\uFF08\u8996\u7DDA/\u76E3\u8996\u306E\u6C17\u914D\uFF09"
+  confirmPointsRequired: 2
+  clueEvidenceTags: 01000000
   gazeSecondsToViolate: 3
   repeatCountToViolate: 3
   repeatWindowSeconds: 2
-  hazardSecondsToViolate: 1.5
-  enrageEnemy: 1
-  toast: 1

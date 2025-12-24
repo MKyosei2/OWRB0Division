@@ -49,7 +49,7 @@ namespace OJikaProto
             _flat.SetPixel(0, 0, Color.white);
             _flat.Apply();
 
-            _style = new GUIStyle(GUI.skin.label)
+            _style = new GUIStyle()
             {
                 fontSize = 12,
                 alignment = TextAnchor.UpperLeft,
@@ -63,7 +63,7 @@ namespace OJikaProto
             if (Input.GetKeyDown(cycleKey))
             {
                 mode = (RouteMode)(((int)mode + 1) % 4);
-                SubtitleManager.Instance?.Add($"【CAM ROUTE】{mode}", 1.2f);
+                SubtitleManager.Instance?.Add($"yCAM ROUTEz{mode}", 1.2f);
             }
 
             if (target == null)
@@ -80,7 +80,7 @@ namespace OJikaProto
             if (mode == RouteMode.Free) return;
             if (target == null || _cam == null) return;
 
-            // デモのカメラ演出と競合しうるので、使う時だけON（ユーザーがF11押した時だけ）
+            // fﾌカoﾆ粁で、gONi[U[F11j
             Vector3 focus = target.position + Vector3.up * targetHeight;
 
             switch (mode)
@@ -118,7 +118,7 @@ namespace OJikaProto
         {
             if (mode == RouteMode.Free) return;
 
-            // 左上に小表示（録画にも残る＝ルートを後で判別できる）
+            // ﾉ十i^ﾉＤ驕ーgﾅ般でＫ
             Rect r = new Rect(12f, 12f, 220f, 24f);
             var prev = GUI.color;
             GUI.color = new Color(0.02f, 0.02f, 0.03f, 0.65f);

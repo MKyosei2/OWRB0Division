@@ -31,7 +31,7 @@ namespace OJikaProto
         public int distortion = 0;
 
         [Tooltip("デバッグ：Play中にメタをリセットするキー")]
-        public KeyCode debugResetKey = KeyCode.F6;
+        public KeyCode debugResetKey = KeyCode.F12;
 
         protected override void Awake()
         {

@@ -4,9 +4,9 @@ using UnityEngine;
 namespace OJikaProto
 {
     /// <summary>
-    /// B‰e–ŒÌ–h~F
-    /// - CaptureMode / Letterbox / Subtitle / AudioVolume ‚ğŠÄ‹
-    /// - NG‚È‚çÔŒxAİ’è‚ª‹–‚³‚ê‚é‚È‚ç©“®C³
+    /// BeÌ–h~F
+    /// - CaptureMode / Letterbox / Subtitle / AudioVolume Ä
+    /// - NGÈ‚ÔŒxAİ’è‚ªÈ‚ç©C
     /// </summary>
     public class Proto_CaptureGuard : MonoBehaviour
     {
@@ -50,7 +50,7 @@ namespace OJikaProto
             _flat.SetPixel(0, 0, Color.white);
             _flat.Apply();
 
-            _warnStyle = new GUIStyle(GUI.skin.label)
+            _warnStyle = new GUIStyle()
             {
                 fontSize = 16,
                 fontStyle = FontStyle.Bold,
@@ -59,7 +59,7 @@ namespace OJikaProto
             };
             _warnStyle.normal.textColor = new Color(1f, 0.35f, 0.35f, 1f);
 
-            _smallStyle = new GUIStyle(GUI.skin.label)
+            _smallStyle = new GUIStyle()
             {
                 fontSize = 12,
                 alignment = TextAnchor.UpperCenter,
@@ -75,7 +75,7 @@ namespace OJikaProto
             if (Input.GetKeyDown(toggleGuardKey))
             {
                 guardEnabled = !guardEnabled;
-                SubtitleManager.Instance?.Add($"yCAPTURE GUARDz{(guardEnabled ? "ON" : "OFF")}", 1.4f);
+                SubtitleManager.Instance?.Add($"yCAPTURE GUARDz{(guardEnabled ? "ON" : "OFF")}", 1.4f);
             }
 
             if (!guardEnabled) return;
@@ -92,19 +92,19 @@ namespace OJikaProto
             {
                 if (requireCaptureMode && !_hud.captureMode)
                 {
-                    _warnings.Add("CAPTURE MODE ‚ª OFF");
+                    _warnings.Add("CAPTURE MODE  OFF");
                     if (autoFix) { _hud.captureMode = true; ToastFix("CaptureMode ON"); }
                 }
 
                 if (requireLetterbox && !_hud.letterbox)
                 {
-                    _warnings.Add("LETTERBOX ‚ª OFF");
+                    _warnings.Add("LETTERBOX  OFF");
                     if (autoFix) { _hud.letterbox = true; ToastFix("Letterbox ON"); }
                 }
             }
             else
             {
-                _warnings.Add("DebugHUD ‚ªŒ©‚Â‚©‚ç‚È‚¢iHUD–¢¶¬Hj");
+                _warnings.Add("DebugHUD Â‚È‚iHUDHj");
             }
 
             // Subtitles
@@ -113,14 +113,14 @@ namespace OJikaProto
                 if (_sub == null) _sub = SubtitleManager.Instance;
                 if (_sub == null)
                 {
-                    _warnings.Add("SubtitleManager ‚ªŒ©‚Â‚©‚ç‚È‚¢");
+                    _warnings.Add("SubtitleManager Â‚È‚");
                 }
                 else
                 {
-                    // enabledSubtitles ‚ª‘¶İ‚·‚é‘O’ñiŠù‚É‘¼‚ÌƒXƒNƒŠƒvƒg‚Å‚àQÆ‚µ‚Ä‚¢‚é‚½‚ßj
+                    // enabledSubtitles İ‚OiÉ‘ÌƒXNvgÅ‚QÆ‚Ä‚é‚½ßj
                     if (!_sub.enabledSubtitles)
                     {
-                        _warnings.Add("SUBTITLE ‚ª OFF");
+                        _warnings.Add("SUBTITLE  OFF");
                         if (autoFix) { _sub.enabledSubtitles = true; ToastFix("Subtitle ON"); }
                     }
                 }
@@ -132,7 +132,7 @@ namespace OJikaProto
                 float v = AudioListener.volume;
                 if (v < minAudioVolume)
                 {
-                    _warnings.Add($"AUDIO ‚ª¬‚³‚·‚¬‚éi{v:0.00}j");
+                    _warnings.Add($"AUDIO i{v:0.00}j");
                     if (autoFix && autoRestoreAudioVolume)
                     {
                         AudioListener.volume = restoreAudioVolume;
@@ -154,9 +154,9 @@ namespace OJikaProto
 
         private void ToastFix(string msg)
         {
-            // š–‹‚ğ‰˜‚µ‚·‚¬‚È‚¢‚æ‚¤’Z‚­
+            // È‚æ‚¤Z
             if (SubtitleManager.Instance != null)
-                SubtitleManager.Instance.Add($"¦AutoFix: {msg}", 1.0f);
+                SubtitleManager.Instance.Add($"AutoFix: {msg}", 1.0f);
         }
 
         private void RefreshRefs()
@@ -171,7 +171,7 @@ namespace OJikaProto
             if (!guardEnabled) return;
             if (_warnings.Count == 0) return;
 
-            // ã•”’†‰›‚ÉÔŒxi˜^‰æ‚É‚à“ü‚é–ŒÌ‚É‹C‚Ã‚¯‚éj
+            // ã•”ÉÔŒxi^É‚éÌ‚É‹CÃ‚j
             float w = Mathf.Min(920f, Screen.width - 40f);
             float h = 72f;
             float x = (Screen.width - w) * 0.5f;

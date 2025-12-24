@@ -57,6 +57,21 @@ namespace OJikaProto
         // Summary text cached
         private string _summaryText = "";
 
+        // -------------------- Intro Help Overlay --------------------
+        [Header("Intro Help (Demo)")]
+        public bool introHelpEnabled = true;
+        public KeyCode introToggleKey = KeyCode.H;
+        public KeyCode introDismissKey = KeyCode.Escape;
+        public KeyCode introAdvanceKey = KeyCode.Space;
+        [Tooltip("Pinned mode: keep showing even after steps end")]
+        public bool introStartPinned = false;
+
+        private bool _showIntroHelp;
+        private bool _introPinned;
+        private int _introStep;
+        private float _introAutoHideT;
+        private bool _introShownOnce;
+
         private void Awake()
         {
             CoreEnsure.EnsureAll();
@@ -81,11 +96,23 @@ namespace OJikaProto
                 EventBus.Instance.OnToast += (msg) => { _toast = msg; _toastT = 2f; };
                 EventBus.Instance.OnRuleViolation += OnRuleViolation;
             }
+
+            // Intro Help init
+            _introPinned = introStartPinned;
+            _showIntroHelp = false;
+            _introStep = 0;
+            _introAutoHideT = 0f;
+            _introShownOnce = false;
+
         }
 
         private void BuildStyles()
         {
-            _titleStyle = new GUIStyle(GUI.skin.label)
+            // IMPORTANT: Do NOT touch GUI.skin here.
+            // GUI.* / GUI.skin are only valid during OnGUI events.
+            // Awake/Start/Update must avoid them.
+
+            _titleStyle = new GUIStyle
             {
                 fontSize = 20,
                 fontStyle = FontStyle.Bold,
@@ -94,7 +121,7 @@ namespace OJikaProto
             };
             _titleStyle.normal.textColor = _text;
 
-            _bodyStyle = new GUIStyle(GUI.skin.label)
+            _bodyStyle = new GUIStyle
             {
                 fontSize = 14,
                 alignment = TextAnchor.UpperLeft,
@@ -102,7 +129,7 @@ namespace OJikaProto
             };
             _bodyStyle.normal.textColor = _text;
 
-            _smallStyle = new GUIStyle(GUI.skin.label)
+            _smallStyle = new GUIStyle
             {
                 fontSize = 12,
                 alignment = TextAnchor.UpperLeft,
@@ -166,6 +193,49 @@ namespace OJikaProto
             if (_enemyLineT > 0f) _enemyLineT -= Time.deltaTime;
 
             if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
+
+
+            // ---- Intro Help (state/input only; no GUI calls here) ----
+            if (introHelpEnabled)
+            {
+                // Auto show once when entering Playing
+                if (!_introShownOnce && _flow != null && _flow.State == FlowState.Playing)
+                {
+                    _introShownOnce = true;
+                    _showIntroHelp = true;
+                    _introStep = 0;
+                    _introAutoHideT = 0f;
+                }
+
+                if (Input.GetKeyDown(introToggleKey))
+                {
+                    _introPinned = !_introPinned;
+                    _showIntroHelp = _introPinned || _showIntroHelp;
+                    _introAutoHideT = 0f;
+                }
+
+                if (_showIntroHelp)
+                {
+                    if (!_introPinned)
+                    {
+                        _introAutoHideT += Time.unscaledDeltaTime;
+                        if (_introAutoHideT > 18f) _showIntroHelp = false;
+                    }
+
+                    if (Input.GetKeyDown(introDismissKey))
+                    {
+                        _showIntroHelp = false;
+                        _introPinned = false;
+                    }
+
+                    if (Input.GetKeyDown(introAdvanceKey) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Return))
+                    {
+                        _introStep = Mathf.Min(_introStep + 1, 3);
+                        _introAutoHideT = 0f;
+                        if (_introStep >= 3 && !_introPinned) _showIntroHelp = false;
+                    }
+                }
+            }
 
             UpdateTimeDistortion();
         }
@@ -339,6 +409,13 @@ namespace OJikaProto
             {
                 GUI.Label(new Rect(r.x + 14, r.y + 12 + i * 22, r.width - 28, 22), lines[i], _bodyStyle);
             }
+            // Intro Help Overlay (draw only in OnGUI)
+            if (introHelpEnabled && _showIntroHelp)
+            {
+                DrawIntroHelpOverlay();
+            }
+
+
         }
 
         // -------------------- Phase / Objective --------------------
@@ -911,5 +988,44 @@ namespace OJikaProto
                 _ => "未確定"
             };
         }
+        // -------------------- Intro Help Overlay (IMGUI) --------------------
+        private void DrawIntroHelpOverlay()
+        {
+            // NOTE: Must be called only from OnGUI
+            float pad = 12f;
+            float w = 520f;
+            float h = 118f;
+            float x = pad;
+            float y = Screen.height - h - pad - (letterbox ? 70f : 0f);
+
+            DrawRect(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.72f));
+            DrawRect(new Rect(x, y, 6f, h), _accent);
+
+            string header = _introPinned ? "操作ヘルプ（固定）" : "操作ヘルプ";
+            string body = GetIntroStepText(_introStep);
+
+            GUI.Label(new Rect(x + 14f, y + 10f, w - 24f, 22f), header, _titleStyle);
+            GUI.Label(new Rect(x + 14f, y + 34f, w - 24f, h - 56f), body, _bodyStyle);
+
+            string footer = $"[{introAdvanceKey}] 次へ / [クリック] 次へ / [{introToggleKey}] 固定 / [{introDismissKey}] 閉じる";
+            GUI.Label(new Rect(x + 14f, y + h - 22f, w - 24f, 18f), footer, _smallStyle);
+        }
+
+        private string GetIntroStepText(int step)
+        {
+            switch (step)
+            {
+                default:
+                case 0:
+                    return "移動：WASD / カメラ：マウス\n攻撃：左=Light / 右=Heavy / E=Seal\n目的：調査→規約→崩し→交渉";
+                case 1:
+                    return "ロックオン：Tab\n遮蔽物（柱）で視線を切る（視線規約の対策）\n監視カメラConeは避けるほど有利";
+                case 2:
+                    return "同じ攻撃の連打は危険（反復規約の対策）\nLight/Heavyを混ぜて戦うと有利\n違反ログを見て次の試行で改善";
+                case 3:
+                    return "敵を崩す（Break）と交渉が可能\n近距離で[F]：交渉開始／対案が出たら[Enter]\n討伐以外（停戦/契約/封印）で決着できる";
+            }
+        }
+
     }
 }

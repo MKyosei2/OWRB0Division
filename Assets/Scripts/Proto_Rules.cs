@@ -377,8 +377,9 @@ public bool TryGetRuleByName(string displayName, out RuleDefinition rule)
             float limit = GetEffectiveGazeSecondsToViolate(r);
             if (_gazeT >= limit)
             {
+                float t = _gazeT;
                 _gazeT = 0f;
-                Violate(r, "視線を合わせ続けた");
+                Violate(r, $"視線を合わせ続けた（{t:0.0}s）");
             }
         }
 
@@ -412,7 +413,7 @@ public bool TryGetRuleByName(string displayName, out RuleDefinition rule)
             {
                 _repeatCount = 0;
                 _repeatWindowT = 0f;
-                Violate(r, "同じ手を続けた");
+                Violate(r, $"同一攻撃を連続使用（{limit}回）");
             }
         }
 

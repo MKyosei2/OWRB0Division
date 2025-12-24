@@ -30,7 +30,7 @@ MonoBehaviour:
     title: "\u53CE\u675F\u4F5C\u6226"
     description: "\u898F\u7D04\u2192\u5D29\u3057\u2192\u4EA4\u6E09\uFF08F\uFF09\u3067\u6C7A\u7740\u3078\u3002"
     targetEvidenceCount: 2
-    enemyPrefab: {fileID: 2143947486211357307, guid: 076aabe8bb4e0f24c9874a5549326bb0, type: 3}
+    enemyPrefab: {fileID: 6521288064311143602, guid: 076aabe8bb4e0f24c9874a5549326bb0, type: 3}
     negotiationDef: {fileID: 11400000, guid: 09b4aca86ddbe3b4f95ec96045f30209, type: 2}
   - phaseType: 3
     title: "\u5F8C\u65E5\u8AC7"

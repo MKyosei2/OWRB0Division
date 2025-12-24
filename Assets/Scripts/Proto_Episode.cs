@@ -90,9 +90,9 @@ namespace OJikaProto
         {
             IsComplete = false;
             LastOutcome = NegotiationOutcome.None;
-            PhaseIndex = 0;
+            PhaseIndex = 0; 
 
-            // ✅ 規約の伏せ字/解析状態を初期化（調査で特定する前提）
+                        // ✅ 規約の伏せ字/解析状態を初期化（調査で特定する前提）
             RuleManager.Instance?.ResetDiscovery();
             RuleManager.Instance?.ClearRuntime();
             EnterPhase();
