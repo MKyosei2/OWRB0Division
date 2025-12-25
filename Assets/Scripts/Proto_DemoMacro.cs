@@ -33,6 +33,7 @@ namespace OJikaProto
         private void Update()
         {
             if (Input.GetKeyDown(startKey)) StartDemo();
+
             if (Input.GetKeyDown(toggleCaptureKey))
             {
                 _hud = FindObjectOfType<DebugHUD>();
@@ -130,7 +131,7 @@ namespace OJikaProto
             // 自動操作OFF（自由操作に戻す）
             _auto?.EndForDemo();
 
-            // ✅ 提出向けサマリー表示
+            // 提出向けサマリー表示
             RefreshRefs();
             if (_hud != null)
                 _hud.ShowRunSummary(BuildSummaryText());
@@ -151,7 +152,7 @@ namespace OJikaProto
 
         private void Subtitle(string text, float seconds) => SubtitleManager.Instance?.Add(text, seconds);
 
-        // objectで返す（WaitForSecondsRealtime対応）
+        // WaitForSecondsRealtime対応
         private object Wait(float seconds)
         {
             float s = seconds / Mathf.Max(0.01f, demoSpeed);
@@ -179,10 +180,10 @@ namespace OJikaProto
             string outcome = (flow != null) ? flow.LastOutcome.ToString() : "Unknown";
             string carry = (CaseMetaManager.Instance != null) ? CaseMetaManager.Instance.GetCarryoverText() : "（メタ未生成）";
 
-            // 交渉の成立条件（証拠＋譲歩＋学習で緩和）
+            // 交渉成立度の表示（交渉画面が開いていない場合はスキップ）
             string chances = "";
             var nm = NegotiationManager.Instance;
-            if (nm != null && nm.Current != null)
+            if (nm != null && nm.Current != null && nm.Current.options != null)
             {
                 for (int i = 0; i < nm.Current.options.Length; i++)
                 {
@@ -216,28 +217,48 @@ namespace OJikaProto
             _camDir.PlayOrbit(pc.transform, radius, height, degrees, fov, seconds / Mathf.Max(0.01f, demoSpeed));
         }
 
+        // camera presets（Proto_CameraDirectorの実装に合わせる）
         private void CameraShotToInvestigationPoint(bool isA, float move, float hold, float fov)
         {
             if (_camDir == null) return;
 
-            Vector3 focusPos = isA ? new Vector3(-2f, 0.5f, -1f) : new Vector3(2f, 0.5f, -1f);
-            var dummy = new GameObject(isA ? "_Focus_IPA" : "_Focus_IPB");
-            dummy.transform.position = focusPos;
+            // A/Bの区別は名前で軽く
+            var all = FindObjectsOfType<InvestigationPoint>();
+            InvestigationPoint target = null;
+            foreach (var p in all)
+            {
+                if (isA && p.name.Contains("_A")) { target = p; break; }
+                if (!isA && p.name.Contains("_B")) { target = p; break; }
+            }
+            if (target == null && all.Length > 0) target = all[0];
+            if (target == null) return;
 
-            _camDir.PlayShot(dummy.transform, new Vector3(0f, 2.2f, -3.2f), fov, move / demoSpeed, hold / demoSpeed);
-            Destroy(dummy, 6f);
+            // ✅ シグネチャ: PlayShot(Transform target, Vector3 offset, float moveSeconds, float holdSeconds, float fov)
+            // offsetは「被写体の後方・少し上」固定にする（安全）
+            Vector3 offset = new Vector3(0f, 1.8f, -4.2f);
+            _camDir.PlayShot(
+                target.transform,
+                offset,
+                move / Mathf.Max(0.01f, demoSpeed),
+                hold / Mathf.Max(0.01f, demoSpeed),
+                fov
+            );
         }
 
         private void CameraShotCombatWide(float move, float hold, float fov)
         {
             if (_camDir == null) return;
-
             var enemy = FindObjectOfType<EnemyController>();
-            var pc = FindObjectOfType<PlayerController>();
-            Transform focus = (enemy != null) ? enemy.transform : (pc != null ? pc.transform : null);
-            if (focus == null) return;
+            if (enemy == null) return;
 
-            _camDir.PlayShot(focus, new Vector3(0f, 4.2f, -7.0f), fov, move / demoSpeed, hold / demoSpeed);
+            Vector3 offset = new Vector3(0f, 2.4f, -6.8f);
+            _camDir.PlayShot(
+                enemy.transform,
+                offset,
+                move / Mathf.Max(0.01f, demoSpeed),
+                hold / Mathf.Max(0.01f, demoSpeed),
+                fov
+            );
         }
 
         private void CameraShotEnemyClose(float move, float hold, float fov)
@@ -246,7 +267,32 @@ namespace OJikaProto
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
 
-            _camDir.PlayShot(enemy.transform, new Vector3(1.2f, 1.6f, -2.2f), fov, move / demoSpeed, hold / demoSpeed);
+            // ✅ PlayClose が無いので PlayShot で「寄り」を表現
+            Vector3 offset = new Vector3(0f, 1.5f, -2.6f);
+            _camDir.PlayShot(
+                enemy.transform,
+                offset,
+                move / Mathf.Max(0.01f, demoSpeed),
+                hold / Mathf.Max(0.01f, demoSpeed),
+                fov
+            );
+        }
+
+        private void CameraPullBackEnding(float move, float hold, float fov)
+        {
+            if (_camDir == null) return;
+            var player = FindObjectOfType<PlayerController>();
+            if (player == null) return;
+
+            // ✅ PlayPullback が無いので PlayShot で「引き」を表現
+            Vector3 offset = new Vector3(0f, 2.8f, -9.0f);
+            _camDir.PlayShot(
+                player.transform,
+                offset,
+                move / Mathf.Max(0.01f, demoSpeed),
+                hold / Mathf.Max(0.01f, demoSpeed),
+                fov
+            );
         }
 
         private void CameraOrbitEnemy(float radius, float height, float degrees, float fov, float seconds)
@@ -254,18 +300,7 @@ namespace OJikaProto
             if (_camDir == null) return;
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
-
             _camDir.PlayOrbit(enemy.transform, radius, height, degrees, fov, seconds / Mathf.Max(0.01f, demoSpeed));
-        }
-
-        private void CameraPullBackEnding(float move, float hold, float fov)
-        {
-            if (_camDir == null) return;
-
-            var pc = FindObjectOfType<PlayerController>();
-            if (pc == null) return;
-
-            _camDir.PlayShot(pc.transform, new Vector3(0f, 6.5f, -12.0f), fov, move / demoSpeed, hold / demoSpeed);
         }
     }
 }
