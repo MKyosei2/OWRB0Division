@@ -18,8 +18,8 @@ MonoBehaviour:
   - label: "\u505C\u6226\uFF08\u671F\u9650\u4ED8\u304D\uFF09"
     description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
     baseChance: 0.65
-    evidenceBonusTags: 
-    minEvidenceToSucceed: -1
+    evidenceBonusTags: 00000000
+    minEvidenceToSucceed: 1
     success: 1
     isEmergencyOption: 0
     consumesArbitrationPass: 0
@@ -28,8 +28,8 @@ MonoBehaviour:
   - label: "\u5951\u7D04\uFF08\u5354\u529B\uFF09"
     description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
     baseChance: 0.5
-    evidenceBonusTags: 
-    minEvidenceToSucceed: -1
+    evidenceBonusTags: 0100000003000000
+    minEvidenceToSucceed: 2
     success: 2
     isEmergencyOption: 0
     consumesArbitrationPass: 0
@@ -38,8 +38,8 @@ MonoBehaviour:
   - label: "\u5C01\u5370\uFF08\u5100\u5F0F\uFF09"
     description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
     baseChance: 0.45
-    evidenceBonusTags: 
-    minEvidenceToSucceed: -1
+    evidenceBonusTags: 0200000003000000
+    minEvidenceToSucceed: 2
     success: 3
     isEmergencyOption: 0
     consumesArbitrationPass: 0

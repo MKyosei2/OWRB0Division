@@ -446,7 +446,6 @@ namespace OJikaProto
                 FeedbackManager.Instance?.OnOutcomeResolved(NegotiationOutcome.Slay, _enemy.transform.position);
 
                 CleanupEnemy();
-                RunLogManager.Instance?.LogCombatResolved();
                 _episode.OnCombatResolved(NegotiationOutcome.Slay);
             }
         }
@@ -469,7 +468,6 @@ namespace OJikaProto
 
         private void OnPlayerDied()
         {
-            RunLogManager.Instance?.LogPlayerDied();
             if (_playerHp) _playerHp.ResetHP();
             if (_player && playerSpawn) { _player.position = playerSpawn.position; _player.rotation = playerSpawn.rotation; }
 

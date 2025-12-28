@@ -9,7 +9,7 @@ namespace OJikaProto.EditorTools
     public static class OJikaProto_AllInOne_OneShotSetup
     {
         private const string AssetDir = "Assets/OJikaProtoAssets";
-        private const string ScenePath = "Assets/OJikaProtoAssets/Proto_Case01.unity";
+        private const string ScenePath = "Assets/OJikaProtoAssets/Proto_Case01.unity"; // 自動保存先（不要なら後述のSaveをコメントアウト）
 
         [MenuItem("Tools/OJikaProto/ALL-IN-ONE One Shot Setup (Rebuild Scene)")]
         public static void RebuildScene()
@@ -19,7 +19,7 @@ namespace OJikaProto.EditorTools
 
             EnsureFolder(AssetDir);
 
-            // Light / Ambient
+            // ----- Lighting / Ambient -----
             var lightGO = new GameObject("Directional Light");
             var light = lightGO.AddComponent<Light>();
             light.type = LightType.Directional;
@@ -29,58 +29,61 @@ namespace OJikaProto.EditorTools
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.25f, 0.25f, 0.28f, 1f);
 
-            // Core managers
+            // ----- Core managers -----
             new GameObject("EventBus").AddComponent<OJikaProto.EventBus>();
 
             var runLogMgr = new GameObject("RunLogManager").AddComponent<OJikaProto.RunLogManager>();
-            new GameObject("InvestigationManager").AddComponent<OJikaProto.InvestigationManager>();
-            var ruleMgr = new GameObject("RuleManager").AddComponent<OJikaProto.RuleManager>();
-            new GameObject("NegotiationManager").AddComponent<OJikaProto.NegotiationManager>();
-            var metaMgr = new GameObject("CaseMetaManager").AddComponent<OJikaProto.CaseMetaManager>();
-            new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
+            var invMgr    = new GameObject("InvestigationManager").AddComponent<OJikaProto.InvestigationManager>();
+            var ruleMgr   = new GameObject("RuleManager").AddComponent<OJikaProto.RuleManager>();
+            var negoMgr   = new GameObject("NegotiationManager").AddComponent<OJikaProto.NegotiationManager>();
+            var metaMgr   = new GameObject("CaseMetaManager").AddComponent<OJikaProto.CaseMetaManager>();
+            var infilMgr  = new GameObject("InfiltrationManager").AddComponent<OJikaProto.InfiltrationManager>();
 
+            // ✅ 競合回避：デモ操作と被りやすいのでメタリセットはF12に固定
             metaMgr.debugResetKey = KeyCode.F12;
-            runLogMgr.StartRun();
 
-            // Ground
+            // ----- Ground -----
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
             ApplyColor(ground, new Color(0.12f, 0.12f, 0.14f, 1f));
 
-            // Spawns
+            // ----- Spawns -----
             var playerSpawn = new GameObject("PlayerSpawn").transform;
             playerSpawn.position = new Vector3(0, 1, -2);
 
             var enemySpawn = new GameObject("EnemySpawn").transform;
             enemySpawn.position = new Vector3(0, 1, 3);
 
-            // Player
+            // ----- Player -----
             var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             player.name = "Player";
             player.transform.position = playerSpawn.position;
             ApplyColor(player, new Color(0.25f, 0.55f, 1.0f, 1f));
 
+            // capsule colliderはCharacterControllerに置き換える
             var primCol = player.GetComponent<Collider>();
             if (primCol) Object.DestroyImmediate(primCol);
+
             player.AddComponent<CharacterController>();
 
             var pc = player.AddComponent<OJikaProto.PlayerController>();
-            player.AddComponent<OJikaProto.PlayerHealth>();
+            var pHp = player.AddComponent<OJikaProto.PlayerHealth>();
             var pCombat = player.AddComponent<OJikaProto.PlayerCombat>();
             var lockOn = player.AddComponent<OJikaProto.LockOnController>();
             player.AddComponent<OJikaProto.ContractBoonAbility>();
 
+            // ✅ プロト向け初期値（必要ならここを調整）
             pc.moveSpeed = 5.5f;
             pc.jumpSpeed = 6.0f;
-            pc.gravity = -25f;
+            pc.gravity   = -25f;
 
             pCombat.lightDamage = 12f;
             pCombat.heavyDamage = 22f;
-            pCombat.sealDamage = 6f;
+            pCombat.sealDamage  = 6f;
 
             lockOn.range = 12f;
 
-            // Camera
+            // ----- Camera -----
             Camera cam = Camera.main;
             if (cam == null)
             {
@@ -96,36 +99,45 @@ namespace OJikaProto.EditorTools
             cam.transform.position = new Vector3(0f, 2.5f, -6.5f);
             cam.transform.rotation = Quaternion.Euler(15f, 0f, 0f);
 
+            // 追従リグ
             var rig = cam.GetComponent<OJikaProto.ThirdPersonCameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<OJikaProto.ThirdPersonCameraRig>();
             rig.target = player.transform;
 
+            // デモ用カット割り
             if (cam.GetComponent<OJikaProto.Proto_CameraDirector>() == null)
                 cam.gameObject.AddComponent<OJikaProto.Proto_CameraDirector>();
 
+            // ✅ 撮影救済：F11でルート固定
             if (cam.GetComponent<OJikaProto.Proto_CameraRoute>() == null)
                 cam.gameObject.AddComponent<OJikaProto.Proto_CameraRoute>();
 
-            // HUD
+            // ----- HUD -----
             var hud = new GameObject("HUD");
-            hud.AddComponent<OJikaProto.DebugHUD>();
+
+            // UI/HUD
+            var debugHud = hud.AddComponent<OJikaProto.DebugHUD>();
             hud.AddComponent<OJikaProto.FeedbackManager>();
             hud.AddComponent<OJikaProto.SubtitleManager>();
+
+            // デモ操作
             hud.AddComponent<OJikaProto.Proto_DebugTools>();
             hud.AddComponent<OJikaProto.Proto_DemoMacro>();
             hud.AddComponent<OJikaProto.Proto_AutoPilot>();
+
+            // 録画向けHUD + ガード
             hud.AddComponent<OJikaProto.Proto_CaptureHUD>();
             hud.AddComponent<OJikaProto.Proto_CaptureGuard>();
 
-            // CombatDirector
+            // ----- CombatDirector -----
             var cd = new GameObject("CombatDirector").AddComponent<OJikaProto.CombatDirector>();
             cd.playerSpawn = playerSpawn;
             cd.enemySpawn = enemySpawn;
 
-            // Enemy prefab
+            // ----- Enemy prefab -----
             var enemyPrefab = EnsureEnemyPrefab($"{AssetDir}/Enemy_Case01.prefab");
 
-            // Negotiation asset
+            // ----- Negotiation asset -----
             var neg = EnsureAsset<OJikaProto.NegotiationDefinition>(
                 $"{AssetDir}/NegotiationDefinition_Case01.asset",
                 () => ScriptableObject.CreateInstance<OJikaProto.NegotiationDefinition>());
@@ -133,11 +145,12 @@ namespace OJikaProto.EditorTools
             EnsureNegotiationDefaults(neg);
             EditorUtility.SetDirty(neg);
 
-            // Episode asset
+            // ----- Episode asset -----
             var ep = EnsureAsset<OJikaProto.EpisodeDefinition>(
                 $"{AssetDir}/EpisodeDefinition_Case01.asset",
                 () => ScriptableObject.CreateInstance<OJikaProto.EpisodeDefinition>());
 
+            // Combatフェーズに prefab/neg を紐付け
             if (ep.phases != null)
             {
                 for (int i = 0; i < ep.phases.Length; i++)
@@ -151,19 +164,19 @@ namespace OJikaProto.EditorTools
             }
             EditorUtility.SetDirty(ep);
 
-            // Rules
+            // ----- Rules (ScriptableObject) -----
             var ruleGaze = EnsureAsset<OJikaProto.RuleDefinition>(
                 $"{AssetDir}/Rule_Gaze.asset",
                 () =>
                 {
                     var r = ScriptableObject.CreateInstance<OJikaProto.RuleDefinition>();
                     r.ruleType = OJikaProto.RuleType.GazeProhibition;
-                    r.displayName = "RULE_GAZE";
+                    r.displayName = "視線を合わせるな";
                     r.gazeSecondsToViolate = 3.0f;
                     r.feedbackIntensity = 0.85f;
                     r.startHidden = true;
-                    r.hiddenLabel = "?";
-                    r.hintText = "HINT_GAZE";
+                    r.hiddenLabel = "？？？";
+                    r.hintText = "（視線/監視の気配）";
                     r.confirmPointsRequired = 2;
                     r.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.StationStaff_Avoid };
                     return r;
@@ -175,24 +188,25 @@ namespace OJikaProto.EditorTools
                 {
                     var r = ScriptableObject.CreateInstance<OJikaProto.RuleDefinition>();
                     r.ruleType = OJikaProto.RuleType.RepeatAttackProhibition;
-                    r.displayName = "RULE_REPEAT";
+                    r.displayName = "同じ手を続けるな";
                     r.repeatCountToViolate = 3;
                     r.repeatWindowSeconds = 2.0f;
                     r.feedbackIntensity = 0.85f;
                     r.startHidden = true;
-                    r.hiddenLabel = "?";
-                    r.hintText = "HINT_REPEAT";
+                    r.hiddenLabel = "？？？";
+                    r.hintText = "（反復/時計の違和感）";
                     r.confirmPointsRequired = 2;
                     r.clueEvidenceTags = new[] { OJikaProto.EvidenceTag.CCTV_Loop, OJikaProto.EvidenceTag.Clock_DeviceHint };
                     return r;
                 });
 
+            // RuleManagerへ登録（初期ルール）
             ruleMgr.activeRules.Clear();
             ruleMgr.activeRules.Add(ruleGaze);
             ruleMgr.activeRules.Add(ruleRepeat);
             EditorUtility.SetDirty(ruleMgr);
 
-            // Investigation points
+            // ----- Investigation points -----
             var ip1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ip1.name = "InvestigationPoint_A";
             ip1.transform.position = new Vector3(-2, 0.5f, -1);
@@ -207,7 +221,7 @@ namespace OJikaProto.EditorTools
             ApplyColor(ip2, new Color(0.25f, 0.95f, 0.55f, 1f));
             ip2.AddComponent<OJikaProto.InvestigationPoint>().evidenceTag = OJikaProto.EvidenceTag.Clock_DeviceHint;
 
-            // Security cameras
+            // ----- Security Cameras -----
             var camA = new GameObject("SecurityCamera_A");
             camA.transform.position = new Vector3(-3.5f, 2.2f, -0.2f);
             camA.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
@@ -228,40 +242,48 @@ namespace OJikaProto.EditorTools
             coneB.reason = "Camera B";
             coneB.seenIntensity01 = 0.9f;
 
-            // Cover
+            // ----- Pillar (cover) -----
             var pillar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pillar.name = "Pillar";
             pillar.transform.position = new Vector3(-2.6f, 1.0f, -0.5f);
             pillar.transform.localScale = new Vector3(0.5f, 1.0f, 0.5f);
             ApplyColor(pillar, new Color(0.18f, 0.18f, 0.20f, 1f));
 
-            // EpisodeController
+            // ----- EpisodeController -----
             var ec = new GameObject("EpisodeController").AddComponent<OJikaProto.EpisodeController>();
             ec.episode = ep;
             ec.combatDirector = cd;
             ec.autoStart = false;
 
-            // Flow
+            // ----- Flow -----
             var flow = new GameObject("GameFlow").AddComponent<OJikaProto.GameFlowController>();
+
+            // ✅ ここが「Inspector設定」：参照を確実に全部つなぐ
             flow.gameTitle = "OJI-KA";
-            flow.subtitle = "CASE01";
-            flow.conceptLine = "RULES x ACTION x NEGOTIATION";
+            flow.subtitle = "CASE 01 : 終電のいない駅";
+            flow.conceptLine = "“規約”が戦闘ルールを変える / 調査が交渉を変える";
+
             flow.episode = ec;
             flow.player = pc;
             flow.playerCombat = pCombat;
             flow.lockOn = lockOn;
             flow.cameraRig = rig;
 
+            // ついで：プレイヤーがカメラ参照を持っていない場合の保険
             if (pc.cameraRoot == null && Camera.main != null) pc.cameraRoot = Camera.main.transform;
 
-            // Save
+            // ----- Save assets + scene -----
             AssetDatabase.SaveAssets();
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+
+            // ✅ シーンを一度保存（不要ならこの2行をコメントアウト）
+            if (!AssetDatabase.IsValidFolder(AssetDir)) EnsureFolder(AssetDir);
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), ScenePath);
 
-            Debug.Log("OJikaProto: OneShotSetup done.");
+            Debug.Log("OJikaProto: ALL-IN-ONE One Shot Setup completed. Scene rebuilt + wired. Press Play.");
         }
 
+        // ---------- helpers ----------
         private static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
@@ -311,19 +333,19 @@ namespace OJikaProto.EditorTools
                 {
                     new OJikaProto.NegotiationOption
                     {
-                        label = "TRUCE",
+                        label = "停戦（期限付き）",
                         baseChance = 0.65f,
                         success = OJikaProto.NegotiationOutcome.Truce
                     },
                     new OJikaProto.NegotiationOption
                     {
-                        label = "CONTRACT",
+                        label = "契約（協力）",
                         baseChance = 0.50f,
                         success = OJikaProto.NegotiationOutcome.Contract
                     },
                     new OJikaProto.NegotiationOption
                     {
-                        label = "SEAL",
+                        label = "封印（儀式）",
                         baseChance = 0.45f,
                         success = OJikaProto.NegotiationOutcome.Seal
                     },

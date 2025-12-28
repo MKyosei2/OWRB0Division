@@ -166,7 +166,6 @@ namespace OJikaProto
 
         public void OnNegotiationSuccess()
         {
-            SpawnBurst(Camera.main ? Camera.main.transform.position + Camera.main.transform.forward*1.5f : Vector3.zero, 0.35f, 0.45f, 18);
             // 成功：青緑寄りで“勝ち”
             Flash(new Color(0.20f, 0.95f, 0.85f, 1f), 0.16f);
             PlaySfx(_clipUISuccess, Random.Range(0.98f, 1.05f), 0.95f);
@@ -176,7 +175,6 @@ namespace OJikaProto
 
         public void OnNegotiationFail()
         {
-            SpawnBurst(Camera.main ? Camera.main.transform.position + Camera.main.transform.forward*1.2f : Vector3.zero, 0.25f, 0.35f, 12);
             // 失敗：赤寄り（やりすぎない）
             Flash(new Color(1f, 0.25f, 0.25f, 1f), 0.12f);
             PlaySfx(_clipUIFail, Random.Range(0.90f, 1.00f), 0.85f);
@@ -487,42 +485,5 @@ namespace OJikaProto
             clip.SetData(data, 0);
             return clip;
         }
-        // --- Minimal VFX (runtime) ---
-        private void SpawnBurst(Vector3 pos, float size, float life, int count)
-        {
-            var go = new GameObject("_VFX_Burst");
-            go.transform.position = pos;
-            var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.duration = life;
-            main.startLifetime = life * 0.7f;
-            main.startSpeed = size * 2.5f;
-            main.startSize = size;
-            main.loop = false;
-            main.playOnAwake = false;
-
-            var em = ps.emission;
-            em.rateOverTime = 0f;
-            var burst = new ParticleSystem.Burst(0f, (short)Mathf.Clamp(count, 4, 128));
-            em.SetBursts(new[] { burst });
-
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Sphere;
-            shape.radius = Mathf.Max(0.1f, size * 0.35f);
-
-            var col = ps.colorOverLifetime;
-            col.enabled = true;
-            var grad = new Gradient();
-            grad.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.55f,0.95f,0.85f,1f), 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-            );
-            col.color = grad;
-
-            ps.Play();
-            Destroy(go, life + 0.3f);
-        }
-
     }
 }

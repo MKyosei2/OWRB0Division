@@ -10,7 +10,7 @@ namespace OJikaProto
         public KeyCode toggleCaptureKey = KeyCode.F9;
 
         [Header("Timing")]
-        [Tooltip("1.0=約3分 / 2.0=約1.5分")]
+        [Tooltip("1.0=標準 / 2.0=倍速")]
         public float demoSpeed = 1.0f;
 
         [Header("Demo")]
@@ -55,6 +55,7 @@ namespace OJikaProto
             // 放置デモ：自動操作ON
             _auto?.BeginForDemo();
 
+            // タイトルへ戻す（存在する場合）
             if (_flow != null && _flow.State != FlowState.Title)
                 _flow.BackToTitle();
 
@@ -117,7 +118,7 @@ namespace OJikaProto
             CameraShotEnemyClose(move: 0.8f, hold: 1.6f, fov: 48f);
             yield return Wait(1.8f);
 
-            // 以降はAutoPilotが戦闘→BREAK→交渉→決着まで持っていく
+            // 以降はAutoPilotが戦闘→BREAK→交渉→決着まで持っていく想定
             CameraOrbitEnemy(radius: 4.5f, height: 2.2f, degrees: 120f, fov: 50f, seconds: 3.8f);
             yield return Wait(6.0f);
 
@@ -152,8 +153,7 @@ namespace OJikaProto
 
         private void Subtitle(string text, float seconds) => SubtitleManager.Instance?.Add(text, seconds);
 
-        // WaitForSecondsRealtime対応
-        private object Wait(float seconds)
+        private WaitForSecondsRealtime Wait(float seconds)
         {
             float s = seconds / Mathf.Max(0.01f, demoSpeed);
             return new WaitForSecondsRealtime(s);
@@ -180,7 +180,6 @@ namespace OJikaProto
             string outcome = (flow != null) ? flow.LastOutcome.ToString() : "Unknown";
             string carry = (CaseMetaManager.Instance != null) ? CaseMetaManager.Instance.GetCarryoverText() : "（メタ未生成）";
 
-            // 交渉成立度の表示（交渉画面が開いていない場合はスキップ）
             string chances = "";
             var nm = NegotiationManager.Instance;
             if (nm != null && nm.Current != null && nm.Current.options != null)
@@ -208,34 +207,45 @@ namespace OJikaProto
                 $"NOTES\n・Take番号は右上表示 / F7,F8で変更\n・Escでこのサマリーを閉じる";
         }
 
-        // camera presets
+        // =========================================================
+        // Camera helpers (match existing Proto_CameraDirector API)
+        //   PlayShot(Transform target, Vector3 offset, float moveSeconds, float holdSeconds, float fov)
+        //   PlayOrbit(Transform target, float radius, float height, float degrees, float fov, float seconds)
+        // =========================================================
+
         private void CameraOrbitAroundPlayer(float radius, float height, float degrees, float fov, float seconds)
         {
             if (_camDir == null) return;
             var pc = FindObjectOfType<PlayerController>();
             if (pc == null) return;
-            _camDir.PlayOrbit(pc.transform, radius, height, degrees, fov, seconds / Mathf.Max(0.01f, demoSpeed));
+
+            _camDir.PlayOrbit(
+                pc.transform,
+                radius,
+                height,
+                degrees,
+                fov,
+                seconds / Mathf.Max(0.01f, demoSpeed)
+            );
         }
 
-        // camera presets（Proto_CameraDirectorの実装に合わせる）
         private void CameraShotToInvestigationPoint(bool isA, float move, float hold, float fov)
         {
             if (_camDir == null) return;
 
-            // A/Bの区別は名前で軽く
             var all = FindObjectsOfType<InvestigationPoint>();
-            InvestigationPoint target = null;
+            if (all == null || all.Length == 0) return;
+
+            InvestigationPoint target = all[0];
             foreach (var p in all)
             {
                 if (isA && p.name.Contains("_A")) { target = p; break; }
                 if (!isA && p.name.Contains("_B")) { target = p; break; }
             }
-            if (target == null && all.Length > 0) target = all[0];
-            if (target == null) return;
 
-            // ✅ シグネチャ: PlayShot(Transform target, Vector3 offset, float moveSeconds, float holdSeconds, float fov)
-            // offsetは「被写体の後方・少し上」固定にする（安全）
-            Vector3 offset = new Vector3(0f, 1.8f, -4.2f);
+            // 少し斜め後方から見る
+            Vector3 offset = new Vector3(2.2f, 1.6f, -2.6f);
+
             _camDir.PlayShot(
                 target.transform,
                 offset,
@@ -251,7 +261,9 @@ namespace OJikaProto
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
 
-            Vector3 offset = new Vector3(0f, 2.4f, -6.8f);
+            // 戦闘エリアを広めに押さえる
+            Vector3 offset = new Vector3(0.0f, 3.0f, -6.0f);
+
             _camDir.PlayShot(
                 enemy.transform,
                 offset,
@@ -267,27 +279,11 @@ namespace OJikaProto
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
 
-            // ✅ PlayClose が無いので PlayShot で「寄り」を表現
-            Vector3 offset = new Vector3(0f, 1.5f, -2.6f);
+            // “寄り”は PlayShot + offset プリセットで代用
+            Vector3 offset = new Vector3(1.2f, 1.5f, -2.0f);
+
             _camDir.PlayShot(
                 enemy.transform,
-                offset,
-                move / Mathf.Max(0.01f, demoSpeed),
-                hold / Mathf.Max(0.01f, demoSpeed),
-                fov
-            );
-        }
-
-        private void CameraPullBackEnding(float move, float hold, float fov)
-        {
-            if (_camDir == null) return;
-            var player = FindObjectOfType<PlayerController>();
-            if (player == null) return;
-
-            // ✅ PlayPullback が無いので PlayShot で「引き」を表現
-            Vector3 offset = new Vector3(0f, 2.8f, -9.0f);
-            _camDir.PlayShot(
-                player.transform,
                 offset,
                 move / Mathf.Max(0.01f, demoSpeed),
                 hold / Mathf.Max(0.01f, demoSpeed),
@@ -300,7 +296,33 @@ namespace OJikaProto
             if (_camDir == null) return;
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
-            _camDir.PlayOrbit(enemy.transform, radius, height, degrees, fov, seconds / Mathf.Max(0.01f, demoSpeed));
+
+            _camDir.PlayOrbit(
+                enemy.transform,
+                radius,
+                height,
+                degrees,
+                fov,
+                seconds / Mathf.Max(0.01f, demoSpeed)
+            );
+        }
+
+        private void CameraPullBackEnding(float move, float hold, float fov)
+        {
+            if (_camDir == null) return;
+            var player = FindObjectOfType<PlayerController>();
+            if (player == null) return;
+
+            // “引き”も PlayShot + offset プリセットで代用
+            Vector3 offset = new Vector3(0.0f, 4.0f, -9.0f);
+
+            _camDir.PlayShot(
+                player.transform,
+                offset,
+                move / Mathf.Max(0.01f, demoSpeed),
+                hold / Mathf.Max(0.01f, demoSpeed),
+                fov
+            );
         }
     }
 }
