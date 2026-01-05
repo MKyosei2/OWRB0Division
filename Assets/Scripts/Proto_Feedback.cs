@@ -213,6 +213,28 @@ namespace OJikaProto
             }
         }
 
+        
+        /// <summary>
+        /// Enemy is about to attack (telegraph). Used by Proto_Combat AI to make attacks readable.
+        /// </summary>
+        public void OnEnemyAttackTelegraph(Vector3 atPos)
+        {
+            // Subtle cue: small flash + tiny shake + soft whoosh.
+            Flash(new Color(1f, 1f, 1f, 1f), 0.04f);
+            Shake(0.05f, 0.010f);
+            PlaySfx(_clipBreak, Random.Range(0.95f, 1.08f), VolumeByDistance(atPos, 0.40f));
+        }
+
+        /// <summary>
+        /// Enemy attack connected (hit). Used by Proto_Combat.
+        /// </summary>
+        public void OnEnemyAttackHit(Vector3 atPos)
+        {
+            Flash(new Color(1f, 0.25f, 0.25f, 1f), 0.10f);
+            Shake(0.10f, 0.024f);
+            PlaySfx(_clipHeavy, Random.Range(0.84f, 0.96f), VolumeByDistance(atPos, 0.75f));
+        }
+
         public void OnEnemyBroken(Vector3 atPos)
         {
             SpawnBreakVfx(atPos);

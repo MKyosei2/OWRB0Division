@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -14,7 +14,10 @@ namespace OJikaProto
         private GameFlowController _flow;
         private FlowState _lastState;
 
-        // Intro/outro state
+        
+
+        private NegotiationOutcome _lastOutcome = NegotiationOutcome.None;
+// Intro/outro state
         private bool _showIntro;
         private bool _showOutro;
         private float _t;             // elapsed within current card
@@ -44,6 +47,22 @@ namespace OJikaProto
             _lastState = FlowState.Title;
             EnsureResources();
         }
+
+        private void OnEnable()
+        {
+            if (EventBus.Instance != null) EventBus.Instance.OnEpisodeComplete += OnEpisodeComplete;
+        }
+
+        private void OnDisable()
+        {
+            if (EventBus.Instance != null) EventBus.Instance.OnEpisodeComplete -= OnEpisodeComplete;
+        }
+
+        private void OnEpisodeComplete(NegotiationOutcome o)
+        {
+            _lastOutcome = o;
+        }
+
 
         private void EnsureResources()
         {
@@ -134,6 +153,31 @@ namespace OJikaProto
                 _showOutro = false;
             }
         }
+        private string OutcomeBody()
+        {
+            // Keep as a single-line friendly string; use explicit \n if needed.
+            switch (_lastOutcome)
+            {
+                case NegotiationOutcome.Truce:
+                    return @"停戦は成立した。期限付きの合意は、次の火種も孕む。
+規約を守り、現場を無事に閉じた。";
+                case NegotiationOutcome.Contract:
+                    return @"契約は成立した。対価は支払われ、力は味方になる。
+ただし“約束”は、破れば必ず返ってくる。";
+                case NegotiationOutcome.Seal:
+                    return @"封印は完了した。再発は抑えられたが、管理コストが残る。
+規約は静かに閉じられた。";
+                case NegotiationOutcome.Slay:
+                    return @"討伐で収束した。最短の解決だが、残るものもある。
+現場は守れた。";
+                case NegotiationOutcome.None:
+                default:
+                    return @"収束は未達だ。条件を見直し、次の一手を探せ。
+規約はまだ、こちらを試している。";
+            }
+        }
+
+
 
         private void OnGUI()
         {
@@ -159,8 +203,8 @@ namespace OJikaProto
             float h = Screen.height * 0.40f;
 
             var title = _showIntro ? _flow.gameTitle : "DEBRIEF";
-            var sub = _showIntro ? _flow.subtitle : "ケースは収束した。結末が次へ影響する。";
-            var body = _showIntro ? _flow.conceptLine : "結果はRun Summaryで確認できます。";
+            var sub = _showIntro ? _flow.subtitle : ($"結末：{_lastOutcome}");
+            var body = _showIntro ? _flow.conceptLine : OutcomeBody();
             var hint = _showIntro ? "Space / Click で開始（スキップ可）" : "Space / Click で閉じる";
 
             GUI.color = new Color(1f, 1f, 1f, alpha);

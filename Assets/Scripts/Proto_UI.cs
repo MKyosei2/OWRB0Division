@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -27,6 +27,13 @@ namespace OJikaProto
 
         [Header("Summary Overlay")]
         public bool showSummaryOverlay = false;
+
+
+        [Header("Dev Toggles (Optional)")]
+        public bool showDebugHud = true;
+        public bool showRuleDebug = true;
+        public bool showPerf = false;
+        public bool showDevHotkeys = true;
 
         private AudioSource _audio;
         private Texture2D _flatTex;
@@ -89,7 +96,10 @@ namespace OJikaProto
 
             _baseFixedDelta = Time.fixedDeltaTime;
 
-            BuildStyles();
+            
+
+            ApplyPublicBuildDefaults();
+BuildStyles();
 
             if (EventBus.Instance != null)
             {
@@ -105,6 +115,27 @@ namespace OJikaProto
             _introShownOnce = false;
 
         }
+        private void ApplyPublicBuildDefaults()
+        {
+            // In "public build" (or runtime builds when configured), suppress debug overlays/hotkeys by default.
+            if (!ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+
+            showDebugHud = false;
+            showRuleDebug = false;
+            showPerf = false;
+            showDevHotkeys = false;
+
+            // Keep player-facing HUD elements on.
+            showObjectiveNavi = true;
+            showEnemyGauges = true;
+            showNegotiationPrompt = true;
+            showRuleWarnings = true;
+
+            // Disable dev intro overlay by default for public builds.
+            introHelpEnabled = false;
+        }
+
+
 
         private void BuildStyles()
         {

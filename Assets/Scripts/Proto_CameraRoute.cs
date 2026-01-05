@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -60,7 +60,9 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (Input.GetKeyDown(cycleKey))
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(cycleKey))
             {
                 mode = (RouteMode)(((int)mode + 1) % 4);
                 SubtitleManager.Instance?.Add($"yCAM ROUTEz{mode}", 1.2f);

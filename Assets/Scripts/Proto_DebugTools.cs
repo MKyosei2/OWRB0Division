@@ -15,7 +15,9 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
             if (_ep == null) _ep = FindObjectOfType<EpisodeController>();
 
             // ƒ^ƒCƒgƒ‹/Š®—¹’†‚ÍŒëì“®‚³‚¹‚È‚¢

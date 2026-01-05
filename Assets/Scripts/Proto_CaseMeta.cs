@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
@@ -41,7 +41,9 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (Input.GetKeyDown(debugResetKey))
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(debugResetKey))
             {
                 ResetMeta();
                 EventBus.Instance?.Toast("META RESET");

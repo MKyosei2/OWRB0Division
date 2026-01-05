@@ -282,75 +282,217 @@ namespace OJikaProto
     }
 
     [RequireComponent(typeof(Damageable))]
-    [RequireComponent(typeof(Breakable))]
-    public class EnemyController : MonoBehaviour
+[RequireComponent(typeof(Breakable))]
+public class EnemyController : MonoBehaviour
+{
+    [Header("Locomotion")]
+    public float moveSpeed = 3.2f;
+    public float preferredRange = 2.6f;   // "見合い"距離。ここに収まると横移動しやすい
+    public float attackRange = 1.8f;
+    public float turnSpeed = 9f;
+
+    [Header("Attack")]
+    public float attackDamage = 14f;
+    public float attackCooldown = 1.2f;
+    public float attackWindup = 0.35f;     // 予備動作（テレグラフ）時間
+    public float postAttackRecover = 0.25f;
+
+    [Header("Tactics")]
+    [Range(0f, 1f)] public float strafeChance = 0.55f;
+    public float strafeSpeedMul = 0.85f;
+    public float retreatSpeedMul = 1.05f;
+    public float strafeDirChangeMin = 0.35f;
+    public float strafeDirChangeMax = 0.85f;
+
+    [Header("Enrage (Fail Forward)")]
+    public float enrageMultiplier = 1.25f;
+    public float enrageDuration = 8f;
+
+    private enum AIState { Approach, Strafe, Windup, Recover }
+    private AIState _state = AIState.Approach;
+
+    private Damageable _hp;
+    private Breakable _brk;
+
+    private Transform _player;
+    private PlayerHealth _playerHp;
+
+    private float _cooldown;
+    private float _stateT;
+    private float _enrageT;
+    private int _strafeSign = 1;
+
+    public bool IsEnraged => _enrageT > 0f;
+
+    private void Awake()
     {
-        public float moveSpeed = 3.2f;
-        public float attackRange = 1.8f;
-        public float attackDamage = 14f;
-        public float attackCooldown = 1.2f;
+        _hp = GetComponent<Damageable>();
+        _brk = GetComponent<Breakable>();
+    }
 
-        public float enrageMultiplier = 1.25f;
-        public float enrageDuration = 8f;
+    private void Start()
+    {
+        var pc = FindObjectOfType<PlayerController>();
+        _player = pc ? pc.transform : null;
+        _playerHp = pc ? pc.GetComponent<PlayerHealth>() : null;
 
-        private Damageable _hp;
-        private Breakable _brk;
+        _cooldown = 0f;
+        PickStrafe();
+    }
 
-        private Transform _player;
-        private PlayerHealth _playerHp;
+    private void Update()
+    {
+        if (_hp.IsDead) return;
+        if (_player == null) return;
 
-        private float _cd;
-        private float _enrageT;
-        public bool IsEnraged => _enrageT > 0f;
+        if (_enrageT > 0f) _enrageT -= Time.deltaTime;
 
-        private void Awake()
+        // Broken中は硬直（交渉の窓）
+        if (_brk.IsBroken)
         {
-            _hp = GetComponent<Damageable>();
-            _brk = GetComponent<Breakable>();
+            _state = AIState.Recover;
+            _stateT = 0f;
+            return;
         }
 
-        private void Start()
+        float mul = IsEnraged ? enrageMultiplier : 1f;
+
+        // cooldown
+        if (_cooldown > 0f) _cooldown -= Time.deltaTime;
+
+        // distance
+        Vector3 toP = (_player.position - transform.position);
+        toP.y = 0f;
+        float dist = toP.magnitude;
+        Vector3 dir = dist > 0.001f ? (toP / dist) : transform.forward;
+
+        // face player (soft)
+        var targetRot = Quaternion.LookRotation(dir, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, turnSpeed * Time.deltaTime);
+
+        switch (_state)
         {
-            var pc = FindObjectOfType<PlayerController>();
-            _player = pc ? pc.transform : null;
-            _playerHp = pc ? pc.GetComponent<PlayerHealth>() : null;
-        }
-
-        private void Update()
-        {
-            if (_hp.IsDead) return;
-            if (_player == null) return;
-
-            if (_enrageT > 0f) _enrageT -= Time.deltaTime;
-            if (_brk.IsBroken) return;
-
-            float dist = Vector3.Distance(transform.position, _player.position);
-            if (dist > attackRange)
-            {
-                Vector3 dir = (_player.position - transform.position);
-                dir.y = 0f;
-                dir = dir.normalized;
-
-                float spd = moveSpeed * (IsEnraged ? enrageMultiplier : 1f);
-                transform.position += dir * spd * Time.deltaTime;
-            }
-            else
-            {
-                _cd -= Time.deltaTime;
-                if (_cd <= 0f)
+            case AIState.Approach:
                 {
-                    _cd = attackCooldown / (IsEnraged ? enrageMultiplier : 1f);
-                    if (_playerHp) _playerHp.ApplyDamage(attackDamage);
-                }
-            }
-        }
+                    // 近づく/離れるの判断
+                    if (dist > preferredRange)
+                    {
+                        Move(dir, moveSpeed * mul);
+                    }
+                    else
+                    {
+                        // 見合い→横移動 or 斬り込み
+                        bool doStrafe = Random.value < strafeChance;
+                        _state = doStrafe ? AIState.Strafe : AIState.Windup;
+                        _stateT = 0f;
 
-        public void Enrage()
-        {
-            _enrageT = enrageDuration;
-            EventBus.Instance?.Toast("Enemy Enraged");
+                        if (_state == AIState.Strafe) PickStrafe();
+                    }
+                    // 攻撃レンジならWindupへ
+                    if (dist <= attackRange && _cooldown <= 0f)
+                    {
+                        _state = AIState.Windup;
+                        _stateT = 0f;
+
+                        // テレグラフ（音/フラッシュなどはFeedback側で）
+                        FeedbackManager.Instance?.OnEnemyAttackTelegraph(transform.position);
+                    }
+                    break;
+                }
+
+            case AIState.Strafe:
+                {
+                    _stateT += Time.deltaTime;
+                    // 距離が詰まったら攻撃に移行
+                    if (dist <= attackRange && _cooldown <= 0f)
+                    {
+                        _state = AIState.Windup;
+                        _stateT = 0f;
+                        FeedbackManager.Instance?.OnEnemyAttackTelegraph(transform.position);
+                        break;
+                    }
+
+                    // 近すぎるなら少し下がる
+                    if (dist < attackRange * 0.92f)
+                    {
+                        Move(-dir, moveSpeed * retreatSpeedMul * mul);
+                    }
+                    else
+                    {
+                        Vector3 right = Vector3.Cross(Vector3.up, dir).normalized;
+                        Vector3 strafe = right * _strafeSign;
+                        Move(strafe, moveSpeed * strafeSpeedMul * mul);
+                    }
+
+                    // 一定時間ごとにストレイフ方向変更
+                    if (_stateT >= _nextStrafeSwitch)
+                    {
+                        PickStrafe();
+                        _stateT = 0f;
+                    }
+
+                    // 遠くなりすぎたら追いかける
+                    if (dist > preferredRange * 1.25f) _state = AIState.Approach;
+                    break;
+                }
+
+            case AIState.Windup:
+                {
+                    // Windup中は大きく動かず、距離調整だけ
+                    _stateT += Time.deltaTime;
+                    if (dist > attackRange * 1.15f)
+                        Move(dir, moveSpeed * 0.75f * mul);
+
+                    if (_stateT >= (attackWindup / mul))
+                    {
+                        // attack
+                        if (dist <= attackRange * 1.15f && _playerHp != null)
+                        {
+                            _playerHp.ApplyDamage(attackDamage);
+                            FeedbackManager.Instance?.OnEnemyAttackHit(transform.position);
+                        }
+
+                        _cooldown = attackCooldown / mul;
+                        _state = AIState.Recover;
+                        _stateT = 0f;
+                    }
+                    break;
+                }
+
+            case AIState.Recover:
+                {
+                    _stateT += Time.deltaTime;
+                    if (_stateT >= postAttackRecover)
+                    {
+                        _state = AIState.Approach;
+                        _stateT = 0f;
+                    }
+                    break;
+                }
         }
     }
+
+    private float _nextStrafeSwitch = 0.6f;
+
+    private void PickStrafe()
+    {
+        _strafeSign = (Random.value < 0.5f) ? -1 : 1;
+        _nextStrafeSwitch = Random.Range(strafeDirChangeMin, strafeDirChangeMax);
+    }
+
+    private void Move(Vector3 dir, float spd)
+    {
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
+        transform.position += dir.normalized * spd * Time.deltaTime;
+    }
+
+    public void Enrage()
+    {
+        _enrageT = enrageDuration;
+        EventBus.Instance?.Toast("Enemy Enraged");
+    }
+}
 
     public class CombatDirector : MonoBehaviour
     {

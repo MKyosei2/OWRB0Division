@@ -47,7 +47,9 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (Input.GetKeyDown(toggleKey))
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(toggleKey))
             {
                 _active = !_active;
                 SubtitleManager.Instance?.Add($"ÅyAUTO PILOTÅz{(_active ? "ON" : "OFF")}", 1.4f);

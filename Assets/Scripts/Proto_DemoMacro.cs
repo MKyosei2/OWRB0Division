@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 namespace OJikaProto
@@ -32,7 +32,9 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (Input.GetKeyDown(startKey)) StartDemo();
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(startKey)) StartDemo();
 
             if (Input.GetKeyDown(toggleCaptureKey))
             {
