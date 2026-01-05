@@ -118,6 +118,16 @@ namespace OJikaProto.EditorTools
             // UI/HUD
             var debugHud = hud.AddComponent<OJikaProto.DebugHUD>();
             hud.AddComponent<OJikaProto.FeedbackManager>();
+
+            // ----- Resume / Recap (AI-less) -----
+            var recapGO = new GameObject("ProtoRecapUI");
+            recapGO.AddComponent<OJikaProto.ProtoRecapUI>();
+
+            // Optional warp helper (for "目的地点へ移動")
+            var warpGO = new GameObject("ProtoCheckpointWarp");
+            var warper = warpGO.AddComponent<OJikaProto.ProtoCheckpointWarp>();
+            warper.investigationPoint = playerSpawn;
+            warper.combatStartPoint = enemySpawn;
             hud.AddComponent<OJikaProto.SubtitleManager>();
 
             // デモ操作

@@ -71,12 +71,24 @@ namespace OJikaProto
             LastOutcome = NegotiationOutcome.None;
             SetState(FlowState.Playing);
             RunLogManager.Instance?.StartRun();
-            if (episode != null) episode.BeginEpisode();
+            // If an interrupted save exists, resume from it and show a 1-minute recap card.
+            var save = ProtoSaveSystem.Load();
+            if (episode != null && save != null && save.wasInterrupted)
+            {
+                episode.BeginEpisodeFromSave(save);
+                ProtoRecapUI.Instance?.Show(save);
+            }
+            else
+            {
+                if (episode != null) episode.BeginEpisode();
+            }
         }
 
         public void RestartEpisode()
         {
             LastOutcome = NegotiationOutcome.None;
+            // Fresh start clears resume state
+            ProtoSaveSystem.Clear();
             SetState(FlowState.Playing);
             RunLogManager.Instance?.StartRun();
             if (episode != null) episode.BeginEpisode();

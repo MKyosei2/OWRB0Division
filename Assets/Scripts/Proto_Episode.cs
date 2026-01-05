@@ -56,6 +56,10 @@ namespace OJikaProto
         public int PhaseIndex { get; private set; }
         public EpisodePhase Current => (episode != null && PhaseIndex < episode.phases.Length) ? episode.phases[PhaseIndex] : null;
 
+        // --- Checkpoint / Resume support (for 20min break + 1-week return) ---
+        public string CurrentCheckpointId { get; private set; } = "EP1_START";
+        public bool WasInterrupted { get; private set; } = false;
+
         public NegotiationOutcome LastOutcome { get; private set; } = NegotiationOutcome.None;
         public bool IsComplete { get; private set; }
 
@@ -92,9 +96,38 @@ namespace OJikaProto
             LastOutcome = NegotiationOutcome.None;
             PhaseIndex = 0; 
 
+            CurrentCheckpointId = "EP1_START";
+            WasInterrupted = false;
+
                         // ✅ 規約の伏せ字/解析状態を初期化（調査で特定する前提）
             RuleManager.Instance?.ResetDiscovery();
             RuleManager.Instance?.ClearRuntime();
+            EnterPhase();
+        }
+
+        /// <summary>
+        /// Continue an episode from a saved checkpoint.
+        /// </summary>
+        public void BeginEpisodeFromSave(ProtoSaveState state)
+        {
+            if (state == null || string.IsNullOrEmpty(state.checkpointId))
+            {
+                BeginEpisode();
+                return;
+            }
+
+            IsComplete = false;
+            LastOutcome = NegotiationOutcome.None;
+            WasInterrupted = state.wasInterrupted;
+            CurrentCheckpointId = state.checkpointId;
+
+            // Map checkpoint to a phase.
+            PhaseIndex = FindPhaseIndexForCheckpoint(state.checkpointId);
+
+            // Ensure rule discovery state is coherent
+            RuleManager.Instance?.ResetDiscovery();
+            RuleManager.Instance?.ClearRuntime();
+
             EnterPhase();
         }
 
@@ -127,6 +160,51 @@ namespace OJikaProto
             }
         }
 
+        private int FindPhaseIndexForCheckpoint(string checkpointId)
+        {
+            if (episode == null || episode.phases == null) return 0;
+
+            // Default mappings for EP1
+            if (checkpointId == "EP1_BREAK")
+            {
+                // Start of Combat
+                for (int i = 0; i < episode.phases.Length; i++)
+                    if (episode.phases[i].phaseType == EpisodePhaseType.Combat) return i;
+            }
+            if (checkpointId == "EP1_END")
+            {
+                // Start of Outro
+                for (int i = 0; i < episode.phases.Length; i++)
+                    if (episode.phases[i].phaseType == EpisodePhaseType.Outro) return i;
+            }
+            if (checkpointId == "EP1_INVEST")
+            {
+                for (int i = 0; i < episode.phases.Length; i++)
+                    if (episode.phases[i].phaseType == EpisodePhaseType.Investigation) return i;
+            }
+
+            return 0;
+        }
+
+        private void SetCheckpoint(string checkpointId, string nextObjective)
+        {
+            CurrentCheckpointId = checkpointId;
+
+            // Save minimal state (AI-less recap uses fixed templates)
+            var state = new ProtoSaveState
+            {
+                caseId = "EP1",
+                checkpointId = checkpointId,
+                wasInterrupted = true,
+                nextObjective = nextObjective ?? "",
+                // For prototype: tags/cards are provided by ProtoRecapDatabase templates (AI-less).
+                ruleTags = new string[0],
+                evidenceCardId = ""
+            };
+            ProtoSaveSystem.Save(state);
+            WasInterrupted = true;
+        }
+
         private void EnterPhase()
         {
             var p = Current;
@@ -147,13 +225,19 @@ namespace OJikaProto
                     InvestigationManager.Instance.ResetForEpisode(p.targetEvidenceCount);
                     // ✅ 調査開始時に、規約は一旦「？？？」に戻して解析をやり直す
                     RuleManager.Instance?.ResetDiscovery();
+                    // Checkpoint: early safe resume point
+                    SetCheckpoint("EP1_INVEST", "証拠を集め、異界突入の準備を整える");
                     break;
 
                 case EpisodePhaseType.Combat:
+                    // Checkpoint: recommended break point (~20min)
+                    SetCheckpoint("EP1_BREAK", "異界で規約を突破し、ブレイク→交渉へ持ち込む");
                     combatDirector.BeginCombat(p.enemyPrefab, p.negotiationDef, this);
                     break;
 
                 case EpisodePhaseType.Outro:
+                    // Episode end checkpoint (optional)
+                    SetCheckpoint("EP1_END", "第1話完了。次の現場へ");
                     break;
             }
         }
@@ -163,6 +247,14 @@ namespace OJikaProto
             LastOutcome = outcome;
             CaseMetaManager.Instance?.ApplyOutcome(outcome);
             EventBus.Instance?.Toast($"Resolved: {outcome}");
+            // After a successful resolution, this is no longer an "interrupted" run.
+            var s = ProtoSaveSystem.Load();
+            if (s != null)
+            {
+                s.lastOutcome = outcome;
+                s.wasInterrupted = false;
+                ProtoSaveSystem.Save(s);
+            }
             NextPhase();
         }
 
