@@ -10,6 +10,11 @@ namespace OJikaProto
     {
         public static ProtoRecapUI Instance { get; private set; }
 
+        /// <summary>
+        /// True while the recap card is on screen and input is intentionally blocked.
+        /// </summary>
+        public bool IsVisible => _visible;
+
         [Header("Visibility")]
         public bool showOnStartIfSaveExists = false;
 
@@ -60,7 +65,7 @@ namespace OJikaProto
         public void HideAndResume(bool warpToObjective)
         {
             _visible = false;
-            Time.timeScale = _prevTimeScale;
+            RestoreTimeScale();
 
             // Mark as no longer "interrupted" so it won't repeat every boot.
             if (_state != null)
@@ -75,6 +80,22 @@ namespace OJikaProto
                 var warper = FindObjectOfType<ProtoCheckpointWarp>();
                 if (warper != null) warper.WarpToNextObjective(_state);
             }
+        }
+
+        private void RestoreTimeScale()
+        {
+            // Guard against leaving the game paused if this UI is destroyed or disabled.
+            Time.timeScale = (_prevTimeScale <= 0f) ? 1f : _prevTimeScale;
+        }
+
+        private void OnDisable()
+        {
+            if (_visible) RestoreTimeScale();
+        }
+
+        private void OnDestroy()
+        {
+            if (_visible) RestoreTimeScale();
         }
 
         private void BuildStyles()

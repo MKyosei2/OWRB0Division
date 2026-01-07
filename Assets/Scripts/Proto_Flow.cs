@@ -31,6 +31,21 @@ namespace OJikaProto
 
         private float _baseFixedDelta;
 
+        private void Update()
+        {
+            // Failsafe: if the recap UI (or any other transient UI) left the game paused,
+            // restore time so player controls work. Camera scripts often still respond to input
+            // when Time.timeScale == 0, which can look like "only the camera works".
+            if (State == FlowState.Playing)
+            {
+                var recapVisible = (ProtoRecapUI.Instance != null && ProtoRecapUI.Instance.IsVisible);
+                if (!recapVisible && Time.timeScale <= 0f)
+                {
+                    ForceTimeNormal();
+                }
+            }
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
