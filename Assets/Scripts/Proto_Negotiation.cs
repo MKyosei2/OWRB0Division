@@ -224,10 +224,15 @@ namespace OJikaProto
 
             FeedbackManager.Instance?.OnNegotiationOpen();
             EventBus.Instance?.Toast("Negotiation Open");
+            // Player-facing phase switch (turn-based clarity)
+            ProtoPhaseDirector.Instance?.SetPhase(ProtoPhase.Negotiation, "交渉：提案を選択する", "NEGOTIATION START", "停戦/契約/封印から選ぶ");
+
         }
 
         public void Close()
         {
+            var ep = _episode;
+
             IsOpen = false;
             Current = null;
             _episode = null;
@@ -236,6 +241,16 @@ namespace OJikaProto
 
             ClearCounterOffer();
             ClearSealRitual();
+
+            // If the player cancels / exits negotiation without resolving, return to Combat phase.
+            if (GameFlowController.Instance != null && GameFlowController.Instance.State == FlowState.Playing)
+            {
+                if (ep != null && ep.Current != null && ep.Current.phaseType == EpisodePhaseType.Combat)
+                {
+                    ProtoPhaseDirector.Instance?.SetPhase(ProtoPhase.Combat, "規約を守りつつブレイクし、交渉へ持ち込む", showCard: false);
+                }
+            }
+
         }
 
         private void ClearCounterOffer()

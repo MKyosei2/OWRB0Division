@@ -207,9 +207,13 @@ namespace OJikaProto
 
         private void EnterPhase()
         {
-            var p = Current;
+var p = Current;
             if (p == null) return;
 
+            // Map internal episode phases to player-facing phases.
+            var phaseDirector = ProtoPhaseDirector.Instance;
+
+            // Movement is allowed in Investigation/Combat only.
             bool combatEnabled = (p.phaseType == EpisodePhaseType.Combat);
             if (_playerCombat) _playerCombat.enabled = combatEnabled;
             if (_lockOn) _lockOn.enabled = combatEnabled;
@@ -219,28 +223,34 @@ namespace OJikaProto
             switch (p.phaseType)
             {
                 case EpisodePhaseType.Intro:
+                    phaseDirector?.SetPhase(ProtoPhase.Story, p.description, "STORY START", "事件概要と目的を確認する");
                     break;
 
                 case EpisodePhaseType.Investigation:
+                    phaseDirector?.SetPhase(ProtoPhase.Investigation, "証拠を集め、規約を特定する", "INVESTIGATION START", "証拠を1〜2個回収して次へ");
                     InvestigationManager.Instance.ResetForEpisode(p.targetEvidenceCount);
-                    // ✅ 調査開始時に、規約は一旦「？？？」に戻して解析をやり直す
+                    // 調査開始時に、規約は一旦「？？？」に戻して解析をやり直す
                     RuleManager.Instance?.ResetDiscovery();
                     // Checkpoint: early safe resume point
                     SetCheckpoint("EP1_INVEST", "証拠を集め、異界突入の準備を整える");
                     break;
 
                 case EpisodePhaseType.Combat:
+                    phaseDirector?.SetPhase(ProtoPhase.Combat, "規約を守りつつブレイクし、交渉へ持ち込む", "COMBAT START", "規約→崩し→交渉");
                     // Checkpoint: recommended break point (~20min)
                     SetCheckpoint("EP1_BREAK", "異界で規約を突破し、ブレイク→交渉へ持ち込む");
                     combatDirector.BeginCombat(p.enemyPrefab, p.negotiationDef, this);
                     break;
 
                 case EpisodePhaseType.Outro:
+                    phaseDirector?.SetPhase(ProtoPhase.Result, "結果を確認し、次のフックを見る", "RESULT", "第1話の結末");
                     // Episode end checkpoint (optional)
                     SetCheckpoint("EP1_END", "第1話完了。次の現場へ");
                     break;
             }
         }
+
+
 
         public void OnCombatResolved(NegotiationOutcome outcome)
         {
