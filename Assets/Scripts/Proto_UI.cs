@@ -279,6 +279,7 @@ BuildStyles();
                 {
                     Time.timeScale = 1f;
                     Time.fixedDeltaTime = _baseFixedDelta;
+                    ProtoDiagnostics.Log("ui.ts1", "UI Restore timeScale to 1", this, 0.5f);
                 }
                 _slowT = 0f;
                 _recovering = false;
@@ -289,6 +290,7 @@ BuildStyles();
             {
                 _slowT -= Time.unscaledDeltaTime;
                 Time.timeScale = violationSlowScale;
+                ProtoDiagnostics.Log("ui.slow", $"UI SlowMo: ts={Time.timeScale:0.00} slowT={_slowT:0.00}", this, 0.25f);
                 Time.fixedDeltaTime = _baseFixedDelta * Time.timeScale;
                 if (_slowT <= 0f) _recovering = true;
                 return;
@@ -304,6 +306,7 @@ BuildStyles();
                 {
                     Time.timeScale = 1f;
                     Time.fixedDeltaTime = _baseFixedDelta;
+                    ProtoDiagnostics.Log("ui.ts1", "UI Restore timeScale to 1", this, 0.5f);
                     _recovering = false;
                 }
             }

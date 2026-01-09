@@ -133,7 +133,8 @@ namespace OJikaProto
 
         public void NextPhase()
         {
-            PhaseIndex++;
+                        Debug.Log($"OJK:DIAG ep.next fromIdx={PhaseIndex} cp={CurrentCheckpointId}");
+PhaseIndex++;
             if (episode == null || PhaseIndex >= episode.phases.Length)
             {
                 IsComplete = true;
@@ -208,7 +209,8 @@ namespace OJikaProto
         private void EnterPhase()
         {
 var p = Current;
-            if (p == null) return;
+                        Debug.Log($"OJK:DIAG ep.enter idx={PhaseIndex} type={p?.phaseType} cp={CurrentCheckpointId}");
+if (p == null) return;
 
             // Map internal episode phases to player-facing phases.
             var phaseDirector = ProtoPhaseDirector.Instance;

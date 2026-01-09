@@ -41,6 +41,7 @@ namespace OJikaProto
                 var recapVisible = (ProtoRecapUI.Instance != null && ProtoRecapUI.Instance.IsVisible);
                 if (!recapVisible && Time.timeScale <= 0f)
                 {
+                    ProtoDiagnostics.Warn("flow.failsafe", "Flow failsafe: timeScale<=0 while Playing and recap not visible. Forcing time normal.", this, 1.0f);
                     ForceTimeNormal();
                 }
             }
@@ -123,7 +124,8 @@ namespace OJikaProto
 
         private void SetState(FlowState s)
         {
-            ForceTimeNormal();
+            ProtoDiagnostics.Warn("flow.failsafe", "Flow failsafe: timeScale<=0 while Playing and recap not visible. Forcing time normal.", this, 1.0f);
+                    ForceTimeNormal();
 
             State = s;
             bool canControl = (State == FlowState.Playing);

@@ -52,6 +52,8 @@ namespace OJikaProto
 
         public void Show(ProtoSaveState state)
         {
+            ProtoDiagnostics.Log("recap.show", $"Recap Show (pause) prevTS={Time.timeScale:0.00}", this, 0.1f);
+
             _state = state;
             _content = ProtoRecapDatabase.GetRecap(state);
             _visible = true;
@@ -90,6 +92,8 @@ namespace OJikaProto
 
         private void OnDisable()
         {
+            ProtoDiagnostics.Log("recap.ondisable", "Recap OnDisable - ensure time restored", this, 0.5f);
+
             if (_visible) RestoreTimeScale();
         }
 

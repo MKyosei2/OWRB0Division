@@ -206,6 +206,8 @@ namespace OJikaProto
 
         public void Begin(NegotiationDefinition def, EpisodeController episode, EnemyController enemy, CombatDirector director)
         {
+            ProtoDiagnostics.Log("neg.begin", "Negotiation Begin/Open", this, 0.1f);
+
             if (def == null) { EventBus.Instance?.Toast("No NegotiationDef"); return; }
             if (Cooldown > 0f) { EventBus.Instance?.Toast("Negotiation Cooldown"); return; }
 
@@ -231,6 +233,8 @@ namespace OJikaProto
 
         public void Close()
         {
+            ProtoDiagnostics.Log("neg.close", "Negotiation Close", this, 0.1f);
+
             var ep = _episode;
 
             IsOpen = false;
@@ -565,6 +569,8 @@ namespace OJikaProto
 
         public void Choose(int idx)
         {
+            ProtoDiagnostics.Log("neg.choose", "Negotiation Choose()", this, 0.05f);
+
             if (!IsOpen || Current == null) return;
             if (idx < 0 || idx >= Current.options.Length) return;
 

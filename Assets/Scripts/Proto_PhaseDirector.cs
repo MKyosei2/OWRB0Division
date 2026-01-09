@@ -35,7 +35,12 @@ namespace OJikaProto
 
         private float _baseFixedDelta;
 
-        // GUI resources
+        
+        [Header("Diagnostics")]
+        public bool diagnostics = true;
+        public float diagnosticsInterval = 1.0f;
+        private float _nextDiagAt;
+// GUI resources
         private Texture2D _flat;
         private GUIStyle _title;
         private GUIStyle _body;
@@ -120,7 +125,8 @@ namespace OJikaProto
 
             ApplyInputGatesForPhase(phase);
 
-            if (this.showPhaseCard && showCard)
+                        if (diagnostics) Debug.Log($"OJK:DIAG phase.set -> {phase} obj={objective} {DumpStatus()}");
+if (this.showPhaseCard && showCard)
                 ShowPhaseCard(phase, CurrentObjective);
         }
 
@@ -144,10 +150,11 @@ namespace OJikaProto
         private void ApplyInputGatesForPhase(ProtoPhase phase)
         {
             // Camera should remain controllable for readability.
-            if (cameraRig != null) cameraRig.enabled = true;
-
-            bool move = (phase == ProtoPhase.Investigation || phase == ProtoPhase.Combat);
+            bool allowControl = (phase == ProtoPhase.Investigation || phase == ProtoPhase.Combat);
+            bool move = allowControl;
             bool combat = (phase == ProtoPhase.Combat);
+
+            if (cameraRig != null) cameraRig.enabled = allowControl;
 
             if (player != null) player.enabled = move;
             if (playerCombat != null) playerCombat.enabled = combat;
@@ -157,7 +164,9 @@ namespace OJikaProto
             bool lockCursor = (phase == ProtoPhase.Investigation || phase == ProtoPhase.Combat);
             Cursor.lockState = lockCursor ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !lockCursor;
-        }
+        
+            if (diagnostics) Debug.Log($"OJK:DIAG input.gate phase={phase} {DumpStatus()}");
+}
 
         private void ForceTimeNormal()
         {
@@ -182,7 +191,17 @@ namespace OJikaProto
             _cardBody = body ?? "";
         }
 
-        private void Update()
+        
+        private string DumpStatus()
+        {
+            string pEn = player != null ? player.enabled.ToString() : "null";
+            string cEn = cameraRig != null ? cameraRig.enabled.ToString() : "null";
+            string combEn = playerCombat != null ? playerCombat.enabled.ToString() : "null";
+            string lockEn = lockOn != null ? lockOn.enabled.ToString() : "null";
+            return $"[phase={CurrentPhase} ts={Time.timeScale:0.00} player={pEn} cam={cEn} combat={combEn} lockOn={lockEn}]";
+        }
+
+private void Update()
         {
             // Fail-safe: if phase is not a "paused" phase but timeScale stuck at 0, recover.
             if (Time.timeScale == 0f)
@@ -197,6 +216,13 @@ namespace OJikaProto
                 if (_cardT >= Mathf.Max(0.25f, phaseCardSeconds))
                     _cardVisible = false;
             }
+            if (diagnostics && Time.unscaledTime >= _nextDiagAt)
+            {
+                _nextDiagAt = Time.unscaledTime + Mathf.Max(0.2f, diagnosticsInterval);
+                Debug.Log($"OJK:DIAG phase.watch {DumpStatus()}");
+            }
+
+
 
             // If references were destroyed/rebuilt, re-acquire.
             if (player == null) AutoFindRefs();
