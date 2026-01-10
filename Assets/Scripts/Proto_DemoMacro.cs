@@ -1,10 +1,19 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 namespace OJikaProto
 {
+    /// <summary>
+    /// 提出/撮影用の放置デモ。
+    /// - AutoPilotとCameraDirectorを使って「1話の見せ場」を短時間で再現する。
+    /// - ProtoBuildConfig.AllowCaptureTools && (シーン許可) の時だけ動作。
+    /// </summary>
     public class Proto_DemoMacro : MonoBehaviour
     {
+        [Header("Guard")]
+        [Tooltip("指定したシーン名の時だけ有効。空なら全シーン許可（非推奨）。")]
+        public string[] allowedSceneNames = new[] { "Demo", "Prototype", "Title" };
+
         [Header("Keys")]
         public KeyCode startKey = KeyCode.F5;
         public KeyCode toggleCaptureKey = KeyCode.F9;
@@ -24,28 +33,51 @@ namespace OJikaProto
         private Proto_CameraDirector _camDir;
         private Proto_AutoPilot _auto;
 
+        private bool AllowedNow()
+        {
+            if (!ProtoBuildConfig.AllowCaptureTools) return false;
+            if (!ProtoBuildConfig.IsSceneAllowed(allowedSceneNames)) return false;
+            return true;
+        }
+
         private void Start()
         {
             RefreshRefs();
-            if (autoStartOnPlay) StartDemo();
+
+            if (!AllowedNow() && !autoStartOnPlay)
+            {
+                enabled = false;
+                return;
+            }
+
+            if (autoStartOnPlay)
+                StartDemo();
         }
 
         private void Update()
         {
-            
-            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
-if (Input.GetKeyDown(startKey)) StartDemo();
+            if (!AllowedNow()) return;
+
+            if (Input.GetKeyDown(startKey)) StartDemo();
 
             if (Input.GetKeyDown(toggleCaptureKey))
             {
                 _hud = FindObjectOfType<DebugHUD>();
                 if (_hud != null) _hud.ToggleCaptureMode();
-                SubtitleManager.Instance?.Add("【CAPTURE】表示切替", 1.2f);
+                SubtitleManager.Instance?.Add("CAPTURE : Toggle", 1.2f);
             }
+        }
+
+        private void OnDisable()
+        {
+            // Ensure we leave no global side effects after demo.
+            Time.timeScale = 1f;
         }
 
         public void StartDemo()
         {
+            if (!AllowedNow()) return;
+
             if (_co != null) StopCoroutine(_co);
             _co = StartCoroutine(DemoCo());
         }
@@ -53,6 +85,10 @@ if (Input.GetKeyDown(startKey)) StartDemo();
         private IEnumerator DemoCo()
         {
             RefreshRefs();
+            ProtoDiagnostics.TrackCounter("demo.start", 1);
+
+            float prevTimeScale = Time.timeScale;
+            Time.timeScale = Mathf.Max(0.05f, demoSpeed);
 
             // 放置デモ：自動操作ON
             _auto?.BeginForDemo();
@@ -139,8 +175,10 @@ if (Input.GetKeyDown(startKey)) StartDemo();
             if (_hud != null)
                 _hud.ShowRunSummary(BuildSummaryText());
 
-            Subtitle("【デモ終了】Escでサマリーを閉じる / F7,F8でTake / F5で再生", 3.0f);
+            Subtitle("【デモ終了】Escでサマリーを閉じる / F5で再生", 3.0f);
 
+            // restore timescale
+            Time.timeScale = prevTimeScale;
             _co = null;
         }
 
@@ -167,6 +205,7 @@ if (Input.GetKeyDown(startKey)) StartDemo();
         {
             RunLogManager.Instance?.LogViolation(ruleName, reason);
             EventBus.Instance?.RuleViolated(ruleName, reason, 0.85f);
+            ProtoDiagnostics.TrackCounter("demo.rule_violation", 1);
         }
 
         private string BuildSummaryText()
@@ -182,31 +221,12 @@ if (Input.GetKeyDown(startKey)) StartDemo();
             string outcome = (flow != null) ? flow.LastOutcome.ToString() : "Unknown";
             string carry = (CaseMetaManager.Instance != null) ? CaseMetaManager.Instance.GetCarryoverText() : "（メタ未生成）";
 
-            string chances = "";
-            var nm = NegotiationManager.Instance;
-            if (nm != null && nm.Current != null && nm.Current.options != null)
-            {
-                for (int i = 0; i < nm.Current.options.Length; i++)
-                {
-                    float baseC, bonus, penalty, finalC;
-                    int have, total;
-                    nm.TryComputeChance(i, out baseC, out bonus, out penalty, out finalC, out have, out total);
-                    chances += $"{i + 1}. {nm.Current.options[i].label}\n"
-                             + $"   成立度 {finalC:P0}（証拠/条件の充足度）\n";
-                }
-            }
-            else
-            {
-                chances = "（交渉画面が開いていないため算出不可）\n";
-            }
-
             return
                 $"OUTCOME : {outcome}\n" +
                 $"CARRYOVER : {carry}\n" +
                 $"VIOLATION : {vio}   COST : {cost:P0}   LEARN : +{ins:P0}\n" +
                 $"PLAYER : HIT {hits}   DMG {dmg:0}\n\n" +
-                $"NEGOTIATION GATES\n{chances}\n" +
-                $"NOTES\n・Take番号は右上表示 / F7,F8で変更\n・Escでこのサマリーを閉じる";
+                "NOTES\n・Escでこのサマリーを閉じる";
         }
 
         // =========================================================
@@ -221,76 +241,7 @@ if (Input.GetKeyDown(startKey)) StartDemo();
             var pc = FindObjectOfType<PlayerController>();
             if (pc == null) return;
 
-            _camDir.PlayOrbit(
-                pc.transform,
-                radius,
-                height,
-                degrees,
-                fov,
-                seconds / Mathf.Max(0.01f, demoSpeed)
-            );
-        }
-
-        private void CameraShotToInvestigationPoint(bool isA, float move, float hold, float fov)
-        {
-            if (_camDir == null) return;
-
-            var all = FindObjectsOfType<InvestigationPoint>();
-            if (all == null || all.Length == 0) return;
-
-            InvestigationPoint target = all[0];
-            foreach (var p in all)
-            {
-                if (isA && p.name.Contains("_A")) { target = p; break; }
-                if (!isA && p.name.Contains("_B")) { target = p; break; }
-            }
-
-            // 少し斜め後方から見る
-            Vector3 offset = new Vector3(2.2f, 1.6f, -2.6f);
-
-            _camDir.PlayShot(
-                target.transform,
-                offset,
-                move / Mathf.Max(0.01f, demoSpeed),
-                hold / Mathf.Max(0.01f, demoSpeed),
-                fov
-            );
-        }
-
-        private void CameraShotCombatWide(float move, float hold, float fov)
-        {
-            if (_camDir == null) return;
-            var enemy = FindObjectOfType<EnemyController>();
-            if (enemy == null) return;
-
-            // 戦闘エリアを広めに押さえる
-            Vector3 offset = new Vector3(0.0f, 3.0f, -6.0f);
-
-            _camDir.PlayShot(
-                enemy.transform,
-                offset,
-                move / Mathf.Max(0.01f, demoSpeed),
-                hold / Mathf.Max(0.01f, demoSpeed),
-                fov
-            );
-        }
-
-        private void CameraShotEnemyClose(float move, float hold, float fov)
-        {
-            if (_camDir == null) return;
-            var enemy = FindObjectOfType<EnemyController>();
-            if (enemy == null) return;
-
-            // “寄り”は PlayShot + offset プリセットで代用
-            Vector3 offset = new Vector3(1.2f, 1.5f, -2.0f);
-
-            _camDir.PlayShot(
-                enemy.transform,
-                offset,
-                move / Mathf.Max(0.01f, demoSpeed),
-                hold / Mathf.Max(0.01f, demoSpeed),
-                fov
-            );
+            _camDir.PlayOrbit(pc.transform, radius, height, degrees, fov, seconds);
         }
 
         private void CameraOrbitEnemy(float radius, float height, float degrees, float fov, float seconds)
@@ -299,32 +250,44 @@ if (Input.GetKeyDown(startKey)) StartDemo();
             var enemy = FindObjectOfType<EnemyController>();
             if (enemy == null) return;
 
-            _camDir.PlayOrbit(
-                enemy.transform,
-                radius,
-                height,
-                degrees,
-                fov,
-                seconds / Mathf.Max(0.01f, demoSpeed)
-            );
+            _camDir.PlayOrbit(enemy.transform, radius, height, degrees, fov, seconds);
+        }
+
+        private void CameraShotToInvestigationPoint(bool isA, float move, float hold, float fov)
+        {
+            if (_camDir == null) return;
+            var points = FindObjectsOfType<InvestigationPoint>();
+            if (points == null || points.Length == 0) return;
+
+            int idx = isA ? 0 : Mathf.Min(1, points.Length - 1);
+            _camDir.PlayShot(points[idx].transform, new Vector3(0f, 2.1f, -2.6f), move, hold, fov);
+        }
+
+        private void CameraShotCombatWide(float move, float hold, float fov)
+        {
+            if (_camDir == null) return;
+            var pc = FindObjectOfType<PlayerController>();
+            if (pc == null) return;
+
+            _camDir.PlayShot(pc.transform, new Vector3(0f, 3.2f, -6.2f), move, hold, fov);
+        }
+
+        private void CameraShotEnemyClose(float move, float hold, float fov)
+        {
+            if (_camDir == null) return;
+            var enemy = FindObjectOfType<EnemyController>();
+            if (enemy == null) return;
+
+            _camDir.PlayShot(enemy.transform, new Vector3(0f, 1.7f, -2.2f), move, hold, fov);
         }
 
         private void CameraPullBackEnding(float move, float hold, float fov)
         {
             if (_camDir == null) return;
-            var player = FindObjectOfType<PlayerController>();
-            if (player == null) return;
+            var pc = FindObjectOfType<PlayerController>();
+            if (pc == null) return;
 
-            // “引き”も PlayShot + offset プリセットで代用
-            Vector3 offset = new Vector3(0.0f, 4.0f, -9.0f);
-
-            _camDir.PlayShot(
-                player.transform,
-                offset,
-                move / Mathf.Max(0.01f, demoSpeed),
-                hold / Mathf.Max(0.01f, demoSpeed),
-                fov
-            );
+            _camDir.PlayShot(pc.transform, new Vector3(0f, 4.5f, -9.0f), move, hold, fov);
         }
     }
 }
