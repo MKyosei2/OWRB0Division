@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ae755b74942d9b40bd1f54748557c80, type: 3}
+  m_Name: Rule_Repeat
+  m_EditorClassIdentifier: 
+  ruleType: 1
+  displayName: "\u898F\u7D04\uFF1A\u9023\u6253\u7981\u6B62"
+  feedbackIntensity: 0.85
+  startHidden: 1
+  hiddenLabel: "\uFF1F\uFF1F\uFF1F"
+  hintText: "\u540C\u3058\u6253\u6483\u304C\u7D9A\u304F"
+  confirmPointsRequired: 2
+  clueEvidenceTags: 02000000
+  gazeSecondsToViolate: 3
+  repeatCountToViolate: 3
+  repeatWindowSeconds: 2

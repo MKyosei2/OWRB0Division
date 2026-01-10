@@ -94,14 +94,15 @@ namespace OJikaProto
         {
             IsComplete = false;
             LastOutcome = NegotiationOutcome.None;
-            PhaseIndex = 0; 
+            PhaseIndex = 0;
 
             CurrentCheckpointId = "EP1_START";
             WasInterrupted = false;
 
-                        // ✅ 規約の伏せ字/解析状態を初期化（調査で特定する前提）
+            // 規約の伏せ字/解析状態を初期化（調査で特定する前提）
             RuleManager.Instance?.ResetDiscovery();
             RuleManager.Instance?.ClearRuntime();
+
             EnterPhase();
         }
 
@@ -133,8 +134,9 @@ namespace OJikaProto
 
         public void NextPhase()
         {
-                        Debug.Log($"OJK:DIAG ep.next fromIdx={PhaseIndex} cp={CurrentCheckpointId}");
-PhaseIndex++;
+            Debug.Log($"OJK:DIAG ep.next fromIdx={PhaseIndex} cp={CurrentCheckpointId}");
+
+            PhaseIndex++;
             if (episode == null || PhaseIndex >= episode.phases.Length)
             {
                 IsComplete = true;
@@ -145,7 +147,7 @@ PhaseIndex++;
             EnterPhase();
         }
 
-        // ✅ デバッグ：戦闘へ即ジャンプ（撮影/検証用）
+        // デバッグ：戦闘へ即ジャンプ（撮影/検証用）
         public void DebugJumpToCombat()
         {
             if (episode == null || episode.phases == null) return;
@@ -168,13 +170,11 @@ PhaseIndex++;
             // Default mappings for EP1
             if (checkpointId == "EP1_BREAK")
             {
-                // Start of Combat
                 for (int i = 0; i < episode.phases.Length; i++)
                     if (episode.phases[i].phaseType == EpisodePhaseType.Combat) return i;
             }
             if (checkpointId == "EP1_END")
             {
-                // Start of Outro
                 for (int i = 0; i < episode.phases.Length; i++)
                     if (episode.phases[i].phaseType == EpisodePhaseType.Outro) return i;
             }
@@ -187,32 +187,37 @@ PhaseIndex++;
             return 0;
         }
 
+        // ★互換：従来の2引数（デフォルトで「中断扱い」）
         private void SetCheckpoint(string checkpointId, string nextObjective)
+        {
+            SetCheckpoint(checkpointId, nextObjective, true);
+        }
+
+        // ★新：中断扱いを選べる
+        private void SetCheckpoint(string checkpointId, string nextObjective, bool markInterrupted)
         {
             CurrentCheckpointId = checkpointId;
 
-            // Save minimal state (AI-less recap uses fixed templates)
             var state = new ProtoSaveState
             {
                 caseId = "EP1",
                 checkpointId = checkpointId,
-                wasInterrupted = true,
+                wasInterrupted = markInterrupted,
                 nextObjective = nextObjective ?? "",
-                // For prototype: tags/cards are provided by ProtoRecapDatabase templates (AI-less).
                 ruleTags = new string[0],
                 evidenceCardId = ""
             };
+
             ProtoSaveSystem.Save(state);
-            WasInterrupted = true;
+            WasInterrupted = markInterrupted;
         }
 
         private void EnterPhase()
         {
-var p = Current;
-                        Debug.Log($"OJK:DIAG ep.enter idx={PhaseIndex} type={p?.phaseType} cp={CurrentCheckpointId}");
-if (p == null) return;
+            var p = Current;
+            Debug.Log($"OJK:DIAG ep.enter idx={PhaseIndex} type={p?.phaseType} cp={CurrentCheckpointId}");
+            if (p == null) return;
 
-            // Map internal episode phases to player-facing phases.
             var phaseDirector = ProtoPhaseDirector.Instance;
 
             // Movement is allowed in Investigation/Combat only.
@@ -231,34 +236,30 @@ if (p == null) return;
                 case EpisodePhaseType.Investigation:
                     phaseDirector?.SetPhase(ProtoPhase.Investigation, "証拠を集め、規約を特定する", "INVESTIGATION START", "証拠を1〜2個回収して次へ");
                     InvestigationManager.Instance.ResetForEpisode(p.targetEvidenceCount);
-                    // 調査開始時に、規約は一旦「？？？」に戻して解析をやり直す
                     RuleManager.Instance?.ResetDiscovery();
-                    // Checkpoint: early safe resume point
-                    SetCheckpoint("EP1_INVEST", "証拠を集め、異界突入の準備を整える");
+                    SetCheckpoint("EP1_INVEST", "証拠を集め、異界突入の準備を整える", true);
                     break;
 
                 case EpisodePhaseType.Combat:
                     phaseDirector?.SetPhase(ProtoPhase.Combat, "規約を守りつつブレイクし、交渉へ持ち込む", "COMBAT START", "規約→崩し→交渉");
-                    // Checkpoint: recommended break point (~20min)
-                    SetCheckpoint("EP1_BREAK", "異界で規約を突破し、ブレイク→交渉へ持ち込む");
+                    SetCheckpoint("EP1_BREAK", "異界で規約を突破し、ブレイク→交渉へ持ち込む", true);
                     combatDirector.BeginCombat(p.enemyPrefab, p.negotiationDef, this);
                     break;
 
                 case EpisodePhaseType.Outro:
                     phaseDirector?.SetPhase(ProtoPhase.Result, "結果を確認し、次のフックを見る", "RESULT", "第1話の結末");
-                    // Episode end checkpoint (optional)
-                    SetCheckpoint("EP1_END", "第1話完了。次の現場へ");
+                    // ★完了なので「中断扱い」にしない（次回起動でResult固定になるのを防ぐ）
+                    SetCheckpoint("EP1_END", "第1話完了。次の現場へ", false);
                     break;
             }
         }
-
-
 
         public void OnCombatResolved(NegotiationOutcome outcome)
         {
             LastOutcome = outcome;
             CaseMetaManager.Instance?.ApplyOutcome(outcome);
             EventBus.Instance?.Toast($"Resolved: {outcome}");
+
             // After a successful resolution, this is no longer an "interrupted" run.
             var s = ProtoSaveSystem.Load();
             if (s != null)
@@ -267,6 +268,7 @@ if (p == null) return;
                 s.wasInterrupted = false;
                 ProtoSaveSystem.Save(s);
             }
+
             NextPhase();
         }
 

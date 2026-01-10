@@ -69,6 +69,8 @@ namespace OJikaProto
                 _flat.Apply();
             }
 
+            if (Event.current == null) return;
+
             _title = new GUIStyle(GUI.skin.label)
             {
                 fontSize = 30,
@@ -269,6 +271,8 @@ namespace OJikaProto
         private void OnGUI()
         {
             if (!_visible) return;
+            // Ensure GUI styles are created inside OnGUI to avoid GUIUtility exceptions.
+            EnsureGui();
             EnsureGui();
 
             // backdrop
