@@ -1,12 +1,7 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace OJikaProto
 {
-    /// <summary>
-    /// 撮影用：カメラの簡易ルート（F11で切替）。
-    /// 注意：CaptureTools が許可されている時だけ動作。
-    /// </summary>
-    [RequireComponent(typeof(Camera))]
     public class Proto_CameraRoute : MonoBehaviour
     {
         public enum RouteMode
@@ -16,10 +11,6 @@ namespace OJikaProto
             OrbitClose,
             LockedWide
         }
-
-        [Header("Guard")]
-        [Tooltip("指定したシーン名の時だけ有効。空なら全シーン許可（非推奨）。")]
-        public string[] allowedSceneNames = new[] { "Demo", "Prototype", "Title" };
 
         [Header("Toggle")]
         public KeyCode cycleKey = KeyCode.F11;
@@ -49,13 +40,6 @@ namespace OJikaProto
         private Texture2D _flat;
         private GUIStyle _style;
 
-        private bool AllowedNow()
-        {
-            if (!ProtoBuildConfig.AllowCaptureTools) return false;
-            if (!ProtoBuildConfig.IsSceneAllowed(allowedSceneNames)) return false;
-            return true;
-        }
-
         private void Awake()
         {
             _cam = GetComponent<Camera>();
@@ -72,18 +56,16 @@ namespace OJikaProto
                 wordWrap = false
             };
             _style.normal.textColor = new Color(0.92f, 0.95f, 0.98f, 0.92f);
-
-            if (!AllowedNow()) enabled = false;
         }
 
         private void Update()
         {
-            if (!AllowedNow()) return;
-
-            if (Input.GetKeyDown(cycleKey))
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(cycleKey))
             {
                 mode = (RouteMode)(((int)mode + 1) % 4);
-                SubtitleManager.Instance?.Add($"CAM ROUTE : {mode}", 1.2f);
+                SubtitleManager.Instance?.Add($"yCAM ROUTEz{mode}", 1.2f);
             }
 
             if (target == null)
@@ -97,10 +79,10 @@ namespace OJikaProto
 
         private void LateUpdate()
         {
-            if (!AllowedNow()) return;
             if (mode == RouteMode.Free) return;
             if (target == null || _cam == null) return;
 
+            // f̃JoƋ̂ŁAgONi[U[F11j
             Vector3 focus = target.position + Vector3.up * targetHeight;
 
             switch (mode)
@@ -136,10 +118,10 @@ namespace OJikaProto
 
         private void OnGUI()
         {
-            if (!AllowedNow()) return;
             if (mode == RouteMode.Free) return;
 
-            Rect r = new Rect(12f, 12f, 240f, 24f);
+            // ɏ\i^ɂc遁[gŔʂłj
+            Rect r = new Rect(12f, 12f, 220f, 24f);
             var prev = GUI.color;
             GUI.color = new Color(0.02f, 0.02f, 0.03f, 0.65f);
             GUI.DrawTexture(r, _flat);

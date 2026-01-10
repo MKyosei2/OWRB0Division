@@ -4,16 +4,12 @@ using UnityEngine;
 namespace OJikaProto
 {
     /// <summary>
-    /// Capture helper: warns when "presentation" settings are inconsistent.
-    /// - CaptureMode / Letterbox / Subtitle / AudioVolume checks
-    /// - Intended for developer/capture builds only.
+    /// Be̖h~F
+    /// - CaptureMode / Letterbox / Subtitle / AudioVolume Ď
+    /// - NGȂԌxAݒ肪Ȃ玩C
     /// </summary>
     public class Proto_CaptureGuard : MonoBehaviour
     {
-        [Header("Guard")]
-        [Tooltip("指定したシーン名の時だけ有効。空なら全シーン許可（非推奨）。")]
-        public string[] allowedSceneNames = new[] { "Demo", "Prototype", "Title" };
-
         [Header("Toggle")]
         public bool guardEnabled = true;
         public bool autoFix = true;
@@ -48,21 +44,8 @@ namespace OJikaProto
         private GameFlowController _flow;
         private SubtitleManager _sub;
 
-        private bool AllowedNow()
-        {
-            if (!ProtoBuildConfig.AllowCaptureTools) return false;
-            if (!ProtoBuildConfig.IsSceneAllowed(allowedSceneNames)) return false;
-            return true;
-        }
-
         private void Awake()
         {
-            if (!AllowedNow())
-            {
-                enabled = false;
-                return;
-            }
-
             _flat = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             _flat.SetPixel(0, 0, Color.white);
             _flat.Apply();
@@ -89,12 +72,10 @@ namespace OJikaProto
 
         private void Update()
         {
-            if (!AllowedNow()) return;
-
             if (Input.GetKeyDown(toggleGuardKey))
             {
                 guardEnabled = !guardEnabled;
-                SubtitleManager.Instance?.Add($"CAPTURE GUARD : {(guardEnabled ? "ON" : "OFF")}", 1.2f);
+                SubtitleManager.Instance?.Add($"yCAPTURE GUARDz{(guardEnabled ? "ON" : "OFF")}", 1.4f);
             }
 
             if (!guardEnabled) return;
@@ -111,19 +92,19 @@ namespace OJikaProto
             {
                 if (requireCaptureMode && !_hud.captureMode)
                 {
-                    _warnings.Add("CAPTURE MODE OFF");
+                    _warnings.Add("CAPTURE MODE  OFF");
                     if (autoFix) { _hud.captureMode = true; ToastFix("CaptureMode ON"); }
                 }
 
                 if (requireLetterbox && !_hud.letterbox)
                 {
-                    _warnings.Add("LETTERBOX OFF");
+                    _warnings.Add("LETTERBOX  OFF");
                     if (autoFix) { _hud.letterbox = true; ToastFix("Letterbox ON"); }
                 }
             }
             else
             {
-                _warnings.Add("DebugHUD missing");
+                _warnings.Add("DebugHUD ȂiHUDHj");
             }
 
             // Subtitles
@@ -132,12 +113,16 @@ namespace OJikaProto
                 if (_sub == null) _sub = SubtitleManager.Instance;
                 if (_sub == null)
                 {
-                    _warnings.Add("SubtitleManager missing");
+                    _warnings.Add("SubtitleManager Ȃ");
                 }
-                else if (!_sub.enabledSubtitles)
+                else
                 {
-                    _warnings.Add("SUBTITLE OFF");
-                    if (autoFix) { _sub.enabledSubtitles = true; ToastFix("Subtitle ON"); }
+                    // enabledSubtitles ݂Oiɑ̃XNvgłQƂĂ邽߁j
+                    if (!_sub.enabledSubtitles)
+                    {
+                        _warnings.Add("SUBTITLE  OFF");
+                        if (autoFix) { _sub.enabledSubtitles = true; ToastFix("Subtitle ON"); }
+                    }
                 }
             }
 
@@ -147,7 +132,7 @@ namespace OJikaProto
                 float v = AudioListener.volume;
                 if (v < minAudioVolume)
                 {
-                    _warnings.Add($"AUDIO {v:0.00}");
+                    _warnings.Add($"AUDIO i{v:0.00}j");
                     if (autoFix && autoRestoreAudioVolume)
                     {
                         AudioListener.volume = restoreAudioVolume;
@@ -169,6 +154,7 @@ namespace OJikaProto
 
         private void ToastFix(string msg)
         {
+            // Ȃ悤Z
             if (SubtitleManager.Instance != null)
                 SubtitleManager.Instance.Add($"AutoFix: {msg}", 1.0f);
         }
@@ -182,10 +168,10 @@ namespace OJikaProto
 
         private void OnGUI()
         {
-            if (!AllowedNow()) return;
             if (!guardEnabled) return;
             if (_warnings.Count == 0) return;
 
+            // 㕔ɐԌxi^ɂ遁̂ɋCÂj
             float w = Mathf.Min(920f, Screen.width - 40f);
             float h = 72f;
             float x = (Screen.width - w) * 0.5f;

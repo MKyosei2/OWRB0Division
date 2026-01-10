@@ -1,5 +1,3 @@
-// Auto-updated: 2026-01-10
-using System;
 using UnityEngine;
 
 namespace OJikaProto
@@ -22,180 +20,36 @@ namespace OJikaProto
         [Range(0f, 1f)] public float adminCostOnLockdown = 0.10f;
         public int analysisPointsOnLockdown = 1;
 
-        [Header("UX")]
+        [Header("UI / Feedback")]
         public float minTimeBetweenToasts = 0.8f;
 
-        [Header("Audit (Step8)")]
+        [Header("Audit / Pressure (Step8)")]
+        [Tooltip("期限/歪みが高いと『監査(AUDIT)』が定期的に入り、見つかりやすくなる。")]
         public bool auditEnabled = true;
+
+        [Tooltip("監査の基本間隔（秒）。期限が増えるほど短くなる")]
         public float auditIntervalBase = 18f;
+
+        [Tooltip("監査の継続時間（秒）。期限が増えるほど長くなる")]
         public float auditDurationBase = 3.5f;
+
+        [Tooltip("監査開始時に発生する軽微な行政コスト（レベルで増える）")]
         [Range(0f, 1f)] public float auditAdminCost = 0.02f;
 
-        public bool IsLockdownActive => Time.unscaledTime < _lockdownUntil;
-        public float LockdownRemaining => Mathf.Max(0f, _lockdownUntil - Time.unscaledTime);
-
-        public bool IsAuditActive => Time.unscaledTime < _auditUntil;
-        public float AuditRemaining => Mathf.Max(0f, _auditUntil - Time.unscaledTime);
-        public float AuditNextIn => (_nextAuditTime < 0f) ? 0f : Mathf.Max(0f, _nextAuditTime - Time.unscaledTime);
-
-        /// <summary>Fires when alert changes (0..1).</summary>
-        public event Action<float> OnAlertChanged;
-        /// <summary>Fires when lockdown starts (reason, duration).</summary>
-        public event Action<string, float> OnLockdownStarted;
-        /// <summary>Fires when audit starts (level, duration).</summary>
-        public event Action<int, float> OnAuditStarted;
-
-        private float _lockdownUntil = -1f;
-        private float _nextToastTime = -1f;
         private float _lastSeenTime = -999f;
+        private float _lockdownUntil = -999f;
+        private float _nextToastTime = -999f;
 
-        private float _auditUntil = -1f;
+        // Step8 audit runtime
         private float _nextAuditTime = -1f;
+        private float _auditUntil = -1f;
 
-        private float _lastAlert01 = -1f;
+        public bool IsLockdownActive => Time.time < _lockdownUntil;
+        public float LockdownRemaining => Mathf.Max(0f, _lockdownUntil - Time.time);
 
-        /// <summary>
-        /// Reset transient state (alert/lockdown/audit) after checkpoint warp or episode restart.
-        /// Evidence/meta should persist; only moment-to-moment timers are cleared.
-        /// </summary>
-        public void ResetTransient(string reason = "")
-        {
-            alert01 = 0f;
-            _lockdownUntil = -1f;
-            _auditUntil = -1f;
-            _nextAuditTime = -1f;
-            _lastSeenTime = -999f;
-            _lastAlert01 = -1f;
-            OnAlertChanged?.Invoke(alert01);
-            ProtoDiagnostics.TrackCounter("infiltration.reset", 1);
-            if (!string.IsNullOrEmpty(reason))
-                ProtoDiagnostics.Log("infiltration.reset.reason", $"Infiltration transient reset: {reason}", this);
-        }
-
-        // Used by ProtoCheckpointWarp via SendMessage.
-        private void OnProtoCheckpointRestored(string checkpointId)
-        {
-            ResetTransient($"checkpoint:{checkpointId}");
-        }
-
-        /// <summary>
-        /// Called by SecurityCameraCone when player is visible.
-        /// </summary>
-        public void ReportPlayerSeen(float intensity01 = 1f, string reason = "Camera")
-        {
-            if (!IsInInvestigationPhase()) return;
-
-            _lastSeenTime = Time.unscaledTime;
-
-            float before = alert01;
-            float dt = Time.unscaledDeltaTime;
-            alert01 = Mathf.Clamp01(alert01 + dt * alertRaisePerSecond * Mathf.Clamp01(intensity01));
-
-            if (alert01 >= 0.999f)
-            {
-                TriggerLockdown(reason);
-                alert01 = 0f; // reset after lockdown to avoid immediate re-trigger loops
-            }
-
-            if (!Mathf.Approximately(before, alert01))
-                OnAlertChanged?.Invoke(alert01);
-        }
-
-        /// <summary>
-        /// Force a security lockdown. Used both by alert overflow and debug tools.
-        /// </summary>
-        public void TriggerLockdown(string reason)
-        {
-            float secMul = 1f;
-
-            // Step8: 期限/歪みで監視強化（行政コストも上がる）
-            var meta = CaseMetaManager.Instance;
-            if (meta != null)
-                secMul = Mathf.Clamp(meta.GetSecurityMultiplier(), 1f, 1.7f);
-
-            float sec = Mathf.Max(0.5f, lockdownSeconds * secMul);
-            _lockdownUntil = Mathf.Max(_lockdownUntil, Time.unscaledTime + sec);
-
-            // Fail Forward：失敗を「学習 + 行政コスト」に変換
-            RunLogManager.Instance?.AddAdministrativeCost(adminCostOnLockdown * secMul);
-            RuleManager.Instance?.GainInsightFromFailure(analysisPointsOnLockdown);
-
-            ProtoDiagnostics.TrackCounter("infiltration.lockdown", 1);
-
-            OnLockdownStarted?.Invoke(reason, sec);
-
-            if (Time.unscaledTime >= _nextToastTime)
-            {
-                EventBus.Instance?.Toast($"SECURITY ALERT: {reason} / LOCKDOWN {LockdownRemaining:0.0}s");
-                _nextToastTime = Time.unscaledTime + minTimeBetweenToasts;
-            }
-        }
-
-        private void Update()
-        {
-            // Step8: 監査(AUDIT)の定期発生（調査フェーズのみ）
-            if (auditEnabled && IsInInvestigationPhase())
-            {
-                int lvl = GetAuditLevel();
-                if (lvl > 0)
-                {
-                    if (_nextAuditTime < 0f) _nextAuditTime = Time.unscaledTime + GetAuditIntervalSeconds(lvl);
-                    if (Time.unscaledTime >= _nextAuditTime)
-                    {
-                        BeginAudit(lvl);
-                        _nextAuditTime = Time.unscaledTime + GetAuditIntervalSeconds(lvl);
-                    }
-                }
-                else
-                {
-                    _nextAuditTime = -1f;
-                    _auditUntil = -1f;
-                }
-            }
-
-            // 直近で視認されていないならALERT減衰
-            bool seenRecently = (Time.unscaledTime - _lastSeenTime) < 0.12f;
-            if (!seenRecently)
-            {
-                float decayMul = (auditEnabled && IsAuditActive) ? 0.45f : 1f;
-                float before = alert01;
-                float dt = Time.unscaledDeltaTime;
-                alert01 = Mathf.Clamp01(alert01 - dt * alertDecayPerSecond * decayMul);
-
-                if (!Mathf.Approximately(before, alert01))
-                    OnAlertChanged?.Invoke(alert01);
-            }
-
-            // Push last alert value if needed
-            if (_lastAlert01 < 0f) _lastAlert01 = alert01;
-            if (!Mathf.Approximately(_lastAlert01, alert01))
-            {
-                _lastAlert01 = alert01;
-                OnAlertChanged?.Invoke(alert01);
-            }
-        }
-
-        private void BeginAudit(int lvl)
-        {
-            float secMul = 1f;
-            var meta = CaseMetaManager.Instance;
-            if (meta != null)
-                secMul = Mathf.Clamp(meta.GetSecurityMultiplier(), 1f, 1.7f);
-
-            float dur = GetAuditDurationSeconds(lvl) * secMul;
-            _auditUntil = Mathf.Max(_auditUntil, Time.unscaledTime + dur);
-
-            RunLogManager.Instance?.AddAdministrativeCost(auditAdminCost * secMul);
-            OnAuditStarted?.Invoke(lvl, dur);
-
-            ProtoDiagnostics.TrackCounter($"infiltration.audit.lv{lvl}", 1);
-
-            if (Time.unscaledTime >= _nextToastTime)
-            {
-                EventBus.Instance?.Toast($"AUDIT START Lv{lvl} ({AuditRemaining:0.0}s)");
-                _nextToastTime = Time.unscaledTime + minTimeBetweenToasts;
-            }
-        }
+        public bool IsAuditActive => Time.time < _auditUntil;
+        public float AuditRemaining => Mathf.Max(0f, _auditUntil - Time.time);
+        public float AuditNextIn => (_nextAuditTime < 0f) ? 0f : Mathf.Max(0f, _nextAuditTime - Time.time);
 
         private int GetAuditLevel()
         {
@@ -208,7 +62,7 @@ namespace OJikaProto
 
         private float GetAuditIntervalSeconds(int lvl)
         {
-            float t = Mathf.Max(5f, auditIntervalBase - 2.2f * lvl);
+            float t = Mathf.Max(5f, auditIntervalBase - 4f * lvl);
             return t;
         }
 
@@ -222,6 +76,95 @@ namespace OJikaProto
         {
             var ep = FindObjectOfType<EpisodeController>();
             return ep != null && ep.Current != null && ep.Current.phaseType == EpisodePhaseType.Investigation;
+        }
+
+        private void BeginAudit(int lvl)
+        {
+            _auditUntil = Time.time + GetAuditDurationSeconds(lvl);
+            RunLogManager.Instance?.AddAdministrativeCost(Mathf.Clamp01(auditAdminCost * lvl));
+            if (Time.time >= _nextToastTime)
+            {
+                EventBus.Instance?.Toast($"AUDIT START  (Lv{lvl})");
+                _nextToastTime = Time.time + minTimeBetweenToasts;
+            }
+        }
+
+        /// <summary>
+        /// カメラなどから「プレイヤーを視認した」通知。視認中は毎フレーム呼ばれてOK。
+        /// </summary>
+        public void ReportPlayerSeen(float intensity01 = 1f, string reason = "Camera")
+        {
+            _lastSeenTime = Time.time;
+
+            float mul = 1f;
+            var meta = CaseMetaManager.Instance;
+            if (meta != null) mul = Mathf.Max(0.5f, meta.GetSecurityMultiplier());
+
+            // Step8: 監査中は検知が鋭くなる
+            int auditLvl = GetAuditLevel();
+            float auditMul = (auditEnabled && IsAuditActive) ? (1f + 0.65f * auditLvl) : 1f;
+
+            float add = Time.deltaTime * alertRaisePerSecond * mul * auditMul * Mathf.Clamp01(intensity01);
+            alert01 = Mathf.Clamp01(alert01 + add);
+
+            if (alert01 >= 1f && !IsLockdownActive)
+            {
+                TriggerLockdown(reason);
+                // 次の視認で即ロックダウン連打にならないよう少し戻す
+                alert01 = 0.25f;
+            }
+        }
+
+        public void TriggerLockdown(string reason)
+        {
+            float mul = 1f;
+            var meta = CaseMetaManager.Instance;
+            if (meta != null) mul = Mathf.Max(0.5f, meta.GetSecurityMultiplier());
+            float secMul = Mathf.Clamp(mul, 1f, 1.35f);
+
+            float sec = Mathf.Max(0.5f, lockdownSeconds) * secMul;
+            _lockdownUntil = Mathf.Max(_lockdownUntil, Time.time + sec);
+
+            // Fail Forward：失敗を「学習 + 行政コスト」に変換
+            RunLogManager.Instance?.AddAdministrativeCost(adminCostOnLockdown * secMul);
+            RuleManager.Instance?.GainInsightFromFailure(analysisPointsOnLockdown);
+
+            if (Time.time >= _nextToastTime)
+            {
+                EventBus.Instance?.Toast($"SECURITY ALERT: {reason} / LOCKDOWN {LockdownRemaining:0.0}s");
+                _nextToastTime = Time.time + minTimeBetweenToasts;
+            }
+        }
+
+        private void Update()
+        {
+            // Step8: 監査(AUDIT)の定期発生（調査フェーズのみ）
+            if (auditEnabled && IsInInvestigationPhase())
+            {
+                int lvl = GetAuditLevel();
+                if (lvl > 0)
+                {
+                    if (_nextAuditTime < 0f) _nextAuditTime = Time.time + GetAuditIntervalSeconds(lvl);
+                    if (Time.time >= _nextAuditTime)
+                    {
+                        BeginAudit(lvl);
+                        _nextAuditTime = Time.time + GetAuditIntervalSeconds(lvl);
+                    }
+                }
+                else
+                {
+                    _nextAuditTime = -1f;
+                    _auditUntil = -1f;
+                }
+            }
+
+            // 直近で視認されていないならALERT減衰
+            bool seenRecently = (Time.time - _lastSeenTime) < 0.12f;
+            if (!seenRecently)
+            {
+                float decayMul = (auditEnabled && IsAuditActive) ? 0.45f : 1f;
+                alert01 = Mathf.Clamp01(alert01 - Time.deltaTime * alertDecayPerSecond * decayMul);
+            }
         }
     }
 
@@ -248,7 +191,6 @@ namespace OJikaProto
 
         private Transform _player;
         private float _baseYaw;
-        private float _nextFindPlayer = 0f;
 
         private void Start()
         {
@@ -268,32 +210,21 @@ namespace OJikaProto
                 viewAngle = Mathf.Clamp(viewAngle * Mathf.Lerp(1f, 1.10f, t), 10f, 170f);
             }
 
-            FindPlayer();
-        }
-
-        private void FindPlayer()
-        {
             var pc = FindObjectOfType<PlayerController>();
             _player = pc ? pc.transform : null;
-            _nextFindPlayer = Time.unscaledTime + 1.0f;
         }
 
         private void Update()
         {
             if (sweep)
             {
-                float a = Mathf.Sin(Time.unscaledTime * sweepSpeed) * (sweepAngle * 0.5f);
+                float a = Mathf.Sin(Time.time * sweepSpeed) * (sweepAngle * 0.5f);
                 var e = transform.eulerAngles;
                 e.y = _baseYaw + a;
                 transform.eulerAngles = e;
             }
 
-            if (_player == null)
-            {
-                if (Time.unscaledTime >= _nextFindPlayer) FindPlayer();
-                return;
-            }
-
+            if (_player == null) return;
             var inf = InfiltrationManager.Instance;
             if (inf == null) return;
 

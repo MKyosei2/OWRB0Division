@@ -3,15 +3,13 @@ using UnityEngine;
 namespace OJikaProto
 {
     /// <summary>
-    /// æ’®å½±ç”¨ï¼šãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‚’è‡ªå‹•æ“ä½œã—ã¦ãƒ‡ãƒ¢ã‚’å®Œå…¨æ”¾ç½®ã§æˆç«‹ã•ã›ã‚‹ã€‚
-    /// æ³¨æ„ï¼šé€šå¸¸ãƒ—ãƒ¬ã‚¤ã§ã¯ç„¡åŠ¹æ¨å¥¨ã€‚ProtoBuildConfig.AllowCaptureTools && (ã‚·ãƒ¼ãƒ³è¨±å¯) ãŒå‰æã€‚
+    /// B‰e—pFƒvƒŒƒCƒ„[‚ğ©“®‘€ì‚µ‚Äƒfƒ‚‚ğŠ®‘S•ú’u‚Å¬—§‚³‚¹‚éB
+    /// - ˆÚ“®F“G‚ÖÚ‹ß/ŠÔ‡‚¢ˆÛ
+    /// - UŒ‚FLight/Heavy/Seal‚ğƒ[ƒei“¯‚¶è˜A‘Å‚ğ”ğ‚¯‚éj
+    /// - BREAK’†FŒğÂ‚ğ©“®‚ÅŠJn¨1”Ô‚ğ‘I‘ği’âíj
     /// </summary>
     public class Proto_AutoPilot : MonoBehaviour
     {
-        [Header("Guard")]
-        [Tooltip("æŒ‡å®šã—ãŸã‚·ãƒ¼ãƒ³åã®æ™‚ã ã‘æœ‰åŠ¹ã€‚ç©ºãªã‚‰å…¨ã‚·ãƒ¼ãƒ³è¨±å¯ï¼ˆéæ¨å¥¨ï¼‰ã€‚")]
-        public string[] allowedSceneNames = new[] { "Demo", "Prototype", "Title" };
-
         [Header("Toggle")]
         public KeyCode toggleKey = KeyCode.F6;
         public bool enabledByDefault = false;
@@ -23,7 +21,7 @@ namespace OJikaProto
         public float forceBreakAfterSeconds = 10f;
 
         [Header("Negotiation")]
-        public int autoChooseIndex = 0; // 0=åœæˆ¦
+        public int autoChooseIndex = 0; // 0=’âí
         public float negotiationOpenDelay = 0.6f;
 
         private bool _active;
@@ -38,40 +36,23 @@ namespace OJikaProto
         private CombatDirector _director;
         private EpisodeController _episode;
 
-        private int _attackStep;
-        private float _nextNegotiateTime;
-
-        private bool AllowedNow()
-        {
-            if (!ProtoBuildConfig.AllowCaptureTools) return false;
-            if (!ProtoBuildConfig.IsSceneAllowed(allowedSceneNames)) return false;
-            return true;
-        }
-
-        private void Awake()
-        {
-            if (!AllowedNow())
-            {
-                enabled = false;
-                return;
-            }
-        }
+        private int _attackStep = 0;
+        private float _nextNegotiateTime = 0f;
 
         private void Start()
         {
-            ProtoDiagnostics.RequireAnyPlayer(this);
             _active = enabledByDefault;
             RefreshRefs();
         }
 
         private void Update()
         {
-            if (!AllowedNow()) return;
-
-            if (Input.GetKeyDown(toggleKey))
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (Input.GetKeyDown(toggleKey))
             {
                 _active = !_active;
-                SubtitleManager.Instance?.Add($"AUTO PILOT : {(_active ? "ON" : "OFF")}", 1.2f);
+                SubtitleManager.Instance?.Add($"yAUTO PILOTz{(_active ? "ON" : "OFF")}", 1.4f);
 
                 if (!_active) ReleaseControl();
             }
@@ -84,7 +65,6 @@ namespace OJikaProto
 
         public void BeginForDemo()
         {
-            if (!AllowedNow()) return;
             _active = true;
             _combatT = 0f;
             _attackT = 0f;
@@ -101,7 +81,7 @@ namespace OJikaProto
 
         private void Tick()
         {
-            // ã‚¿ã‚¤ãƒˆãƒ«/å®Œäº†ä¸­ã¯è§¦ã‚‰ãªã„
+            // ƒ^ƒCƒgƒ‹/Š®—¹’†‚ÍG‚ç‚È‚¢iFlow‚ª–³‚¢ê‡‚Å‚àˆÀ‘Sj
             var flow = FindObjectOfType<GameFlowController>();
             if (flow != null && flow.State != FlowState.Playing)
             {
@@ -111,9 +91,17 @@ namespace OJikaProto
 
             if (_pc == null) return;
 
+            // í“¬‚ª‘¶İ‚·‚é‚È‚çí“¬‚ÌƒI[ƒg
             bool inCombat = (_episode != null && _episode.Current != null && _episode.Current.phaseType == EpisodePhaseType.Combat);
-            if (inCombat) CombatAutopilot();
-            else IdleWander();
+            if (inCombat)
+            {
+                CombatAutopilot();
+            }
+            else
+            {
+                // ’²¸/“±“ü‚È‚Ç‚Íu‚ä‚Á‚­‚è‘Oiv‚¾‚¯iŠG‚ğ“®‚©‚·—pj
+                IdleWander();
+            }
         }
 
         private void IdleWander()
@@ -134,6 +122,7 @@ namespace OJikaProto
 
             if (_enemy == null || _enemyBreak == null || (_enemy != null && _enemy.GetComponent<Damageable>()?.IsDead == true))
             {
+                // “GQÆ‚ªØ‚ê‚Ä‚¢‚éi¶¬‚µ’¼‚µ“™j¨Äæ“¾
                 _enemy = FindObjectOfType<EnemyController>();
                 _enemyBreak = _enemy ? _enemy.GetComponent<Breakable>() : null;
                 _director = FindObjectOfType<CombatDirector>();
@@ -141,6 +130,7 @@ namespace OJikaProto
 
             if (_enemy == null)
             {
+                // “G‚ª‚¢‚È‚¢‚È‚ç—§‚¿~‚Ü‚é
                 _pc.externalMoveWorld = Vector3.zero;
                 _pc.externalLookDirWorld = _pc.transform.forward;
                 return;
@@ -155,40 +145,51 @@ namespace OJikaProto
             toEnemy.y = 0f;
             float dist = toEnemy.magnitude;
 
+            // –ÚüiƒƒbƒNƒIƒ“‚Íg‚í‚¸A‹ü‹K–ñ‚ÌƒgƒŠƒK‚ğ‘‚â‚³‚È‚¢j
             if (toEnemy.sqrMagnitude > 0.001f)
                 _pc.externalLookDirWorld = toEnemy.normalized;
 
+            // ŠÔ‡‚¢ˆÛ
             Vector3 targetPos;
             if (dist > desiredDistance)
+            {
                 targetPos = e - toEnemy.normalized * desiredDistance;
+            }
             else
+            {
+                // ‹ß‚·‚¬‚é‚Æ‚«‚Í­‚µ‰º‚ª‚é
                 targetPos = p - toEnemy.normalized * 0.35f;
+            }
 
             Vector3 move = targetPos - p;
             move.y = 0f;
-            _pc.externalMoveWorld = (move.sqrMagnitude > 0.02f) ? move.normalized : Vector3.zero;
+            if (move.sqrMagnitude > 0.02f)
+                _pc.externalMoveWorld = move.normalized;
+            else
+                _pc.externalMoveWorld = Vector3.zero;
 
-            // BREAK â†’ äº¤æ¸‰
+            // BREAK‚É‚È‚Á‚½‚çŒğÂ‚ğ©“®ŠJn¨‘I‘ğ
             if (_enemyBreak != null && _enemyBreak.IsBroken)
             {
                 if (_breakSeenT < 0f) _breakSeenT = Time.unscaledTime;
 
                 if (Time.unscaledTime >= _nextNegotiateTime)
+                {
                     AutoNegotiation();
+                }
 
                 return;
             }
 
-            // ãƒ‡ãƒ¢å®‰å®šåŒ–ï¼šä¸€å®šæ™‚é–“ã§å¼·åˆ¶BREAK
+            // ˆê’èŠÔŒo‚Á‚Ä‚àBREAK‚µ‚È‚¢‚È‚çƒfƒ‚‚Æ‚µ‚Ä‹­§BREAKiƒŠƒeƒCƒNíŒ¸j
             if (_enemyBreak != null && !_enemyBreak.IsBroken && _combatT >= forceBreakAfterSeconds)
             {
                 _enemyBreak.ApplyBreakDamage(99999f);
-                SubtitleManager.Instance?.Add("â€»ãƒ‡ãƒ¢è£œæ­£ï¼šBREAKã‚’ç¢ºå®šï¼ˆæ’®å½±å®‰å®šåŒ–ï¼‰", 2.0f);
-                ProtoDiagnostics.TrackCounter("demo.force_break", 1);
+                SubtitleManager.Instance?.Add("¦ƒfƒ‚•â³FBREAK‚ğŠm’èiB‰eˆÀ’è‰»j", 2.0f);
                 return;
             }
 
-            // æ”»æ’ƒãƒ­ãƒ¼ãƒ†
+            // UŒ‚FŠÔ‡‚¢‚É“ü‚Á‚Ä‚¢‚é‚È‚çƒ[ƒe
             _attackT += Time.unscaledDeltaTime;
             if (dist <= engageDistance && _attackT >= attackInterval)
             {
@@ -201,6 +202,7 @@ namespace OJikaProto
         {
             if (_combat == null) return;
 
+            // Light ¨ Heavy ¨ Seal ‚ÌzŠÂi“¯‚¶è˜A‘Å‚ğ”ğ‚¯‚éj
             AttackType type = (_attackStep % 3) switch
             {
                 0 => AttackType.Light,
@@ -217,13 +219,12 @@ namespace OJikaProto
             var nm = NegotiationManager.Instance;
             if (nm == null) return;
 
+            // Šù‚ÉŠJ‚¢‚Ä‚¢‚é‚È‚ç­‚µ‘Ò‚Á‚Ä‘I‚Ô
             if (nm.IsOpen)
             {
                 if (Time.unscaledTime - _breakSeenT >= negotiationOpenDelay)
                 {
-                    if (nm.HasCounterOffer) nm.AcceptCounterOffer();
-                    else nm.Choose(autoChooseIndex);
-
+                    if (nm.HasCounterOffer) nm.AcceptCounterOffer(); else nm.Choose(autoChooseIndex);
                     _nextNegotiateTime = Time.unscaledTime + 2.0f;
                 }
                 return;
@@ -233,6 +234,7 @@ namespace OJikaProto
             if (_director == null) _director = FindObjectOfType<CombatDirector>();
             if (_director == null || _enemy == null) return;
 
+            // ƒN[ƒ‹ƒ_ƒEƒ““™‚Ínm‘¤‚Å’e‚­
             nm.Begin(_episode.Current.negotiationDef, _episode, _enemy, _director);
             _breakSeenT = Time.unscaledTime;
             _nextNegotiateTime = Time.unscaledTime + 0.4f;
@@ -240,10 +242,12 @@ namespace OJikaProto
 
         private void ReleaseControl()
         {
-            if (_pc == null) return;
-            _pc.externalControl = false;
-            _pc.externalMoveWorld = Vector3.zero;
-            _pc.externalLookDirWorld = Vector3.zero;
+            if (_pc != null)
+            {
+                _pc.externalControl = false;
+                _pc.externalMoveWorld = Vector3.zero;
+                _pc.externalLookDirWorld = Vector3.zero;
+            }
         }
 
         private void RefreshRefs()
@@ -254,11 +258,6 @@ namespace OJikaProto
             if (_enemy == null) _enemy = FindObjectOfType<EnemyController>();
             if (_enemyBreak == null && _enemy != null) _enemyBreak = _enemy.GetComponent<Breakable>();
             if (_director == null) _director = FindObjectOfType<CombatDirector>();
-        }
-
-        private void OnDisable()
-        {
-            ReleaseControl();
         }
     }
 }

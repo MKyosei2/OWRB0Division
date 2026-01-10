@@ -28,33 +28,6 @@ namespace OJikaProto
 
             player.transform.position = target.position;
             player.transform.rotation = target.rotation;
-
-            // After warping, clear transient runtime states that often cause "stuck" / "lockdown persists" issues.
-            string cp = (state != null) ? state.checkpointId : "";
-            BroadcastCheckpointRestored(cp);
-            ProtoDiagnostics.TrackCounter("checkpoint.warp", 1);
-        }
-
-        private void BroadcastCheckpointRestored(string checkpointId)
-        {
-            // 1) Known singletons
-            InfiltrationManager.Instance?.ResetTransient($"warp:{checkpointId}");
-            RuleManager.Instance?.ClearRuntime();
-            SubtitleManager.Instance?.ClearAll();
-
-            // 2) SendMessage-based hook (optional). Any MonoBehaviour can implement:
-            //    void OnProtoCheckpointRestored(string checkpointId)
-            // This avoids hard dependencies and keeps the prototype flexible.
-            try
-            {
-                var behaviours = FindObjectsOfType<MonoBehaviour>(true);
-                for (int i = 0; i < behaviours.Length; i++)
-                    behaviours[i].SendMessage("OnProtoCheckpointRestored", checkpointId, SendMessageOptions.DontRequireReceiver);
-            }
-            catch
-            {
-                // ignore
-            }
         }
     }
 }

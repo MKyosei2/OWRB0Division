@@ -1,61 +1,46 @@
-// Auto-updated: 2026-01-09
 using UnityEngine;
 
 namespace OJikaProto
 {
-    /// <summary>
-    /// Developer hotkeys for quick iteration.
-    /// Disabled automatically in PROTO_PUBLIC_BUILD / non-debug builds.
-    /// </summary>
     public class Proto_DebugTools : MonoBehaviour
     {
         private GameFlowController _flow;
         private EpisodeController _ep;
 
-        private void Awake()
-        {
-            if (!ProtoBuildConfig.AllowDebugHotkeys)
-            {
-                enabled = false;
-            }
-        }
-
         private void Start()
         {
-            RefreshRefs();
-        }
-
-        private void RefreshRefs()
-        {
-            if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
-            if (_ep == null) _ep = FindObjectOfType<EpisodeController>();
+            _flow = FindObjectOfType<GameFlowController>();
+            _ep = FindObjectOfType<EpisodeController>();
         }
 
         private void Update()
         {
-            if (!ProtoBuildConfig.AllowDebugHotkeys) return;
+            
+            if (ProtoBuildConfig.ShouldSuppressDebugInRuntime()) return;
+if (_flow == null) _flow = FindObjectOfType<GameFlowController>();
+            if (_ep == null) _ep = FindObjectOfType<EpisodeController>();
 
-            if (_flow == null || _ep == null)
-                RefreshRefs();
+            // É^ÉCÉgÉã/äÆóπíÜÇÕåÎçÏìÆÇ≥ÇπÇ»Ç¢
+            if (_flow != null && _flow.State != FlowState.Playing) return;
 
             if (Input.GetKeyDown(KeyCode.F1))
             {
-                // Toggle flow diagram overlay (if present)
-                var ov = FindObjectOfType<Proto_FlowDiagramOverlay>();
-                if (ov != null) ov.enabled = !ov.enabled;
-                EventBus.Instance?.Toast($"Debug: FlowOverlay {(ov != null && ov.enabled ? "ON" : "OFF")}");
+                _ep?.DebugJumpToCombat();
             }
 
             if (Input.GetKeyDown(KeyCode.F2))
             {
-                // Force episode start (Case01)
-                _flow?.StartGame();
-                EventBus.Instance?.Toast("Debug: Start Case01");
+                var enemy = FindObjectOfType<EnemyController>();
+                if (enemy != null)
+                {
+                    var brk = enemy.GetComponent<Breakable>();
+                    if (brk != null) brk.ApplyBreakDamage(99999f);
+                    EventBus.Instance?.Toast("Debug: Enemy Broken");
+                }
             }
 
             if (Input.GetKeyDown(KeyCode.F3))
             {
-                // Give all evidence
                 var im = InvestigationManager.Instance;
                 if (im != null)
                 {
@@ -71,13 +56,6 @@ namespace OJikaProto
             {
                 RunLogManager.Instance?.LogViolation("DEBUG", "forced violation");
                 EventBus.Instance?.RuleViolated("DEBUG", "forced violation", 0.85f);
-                EventBus.Instance?.Toast("Debug: Violation");
-            }
-
-            if (Input.GetKeyDown(KeyCode.F7))
-            {
-                // Force lockdown (to test fail-forward)
-                InfiltrationManager.Instance?.TriggerLockdown("DEBUG");
             }
         }
     }

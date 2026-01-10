@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: EpisodeDefinition_Case01
+  m_EditorClassIdentifier: Assembly-CSharp:OJikaProto:EpisodeDefinition
+  episodeName: "\u7D42\u96FB\u306E\u3044\u306A\u3044\u99C5\uFF08\u691C\u8A3C\u30B7\u30FC\u30F3\uFF09"
+  phases:
+  - phaseType: 0
+    title: "\u5C0E\u5165"
+    description: "Enter\u3067\u958B\u59CB"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}
+  - phaseType: 1
+    title: "\u8ABF\u67FB"
+    description: "\u8ABF\u67FB\u30DD\u30A4\u30F3\u30C8\u306B\u8FD1\u3065\u3044\u3066E\u3067\u8A3C\u62E0\u3092\u53D6\u5F97\u3002\u8A3C\u62E0\u304C\u63C3\u3063\u305F\u3089Enter\u3002"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}
+  - phaseType: 2
+    title: "\u53CE\u675F\u4F5C\u6226"
+    description: "\u898F\u7D04\u2192\u5D29\u3057\u2192\u4EA4\u6E09\uFF08F\uFF09\u3067\u6C7A\u7740\u3078\u3002"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 3733618466697831984, guid: 1c686ad7d32b27e4dbd7dfa0735eb004, type: 3}
+    negotiationDef: {fileID: 11400000, guid: d9a672bef68616f4c847cebd9c7745a2, type: 2}
+  - phaseType: 3
+    title: "\u5F8C\u65E5\u8AC7"
+    description: "Enter\u3067\u5B8C\u4E86"
+    targetEvidenceCount: 2
+    enemyPrefab: {fileID: 0}
+    negotiationDef: {fileID: 0}
+  outroTexts:
+  - outcome: 1
+    line1: "\u99C5\u54E1\u306F\u300E\u4F55\u3082\u8D77\u304D\u3066\u3044\u306A\u3044\u300F\u3068\u8A00\u3044\u5F35\u3063\u305F\u3002"
+    line2: "\u3042\u306A\u305F\u306F\u30E1\u30E2\u306B\u201C\u671F\u9650\u201D\u3068\u3060\u3051\u66F8\u304D\u6B8B\u3059\u3002"
+    line3: "\u6B21\u306E\u7D42\u96FB\u304C\u6765\u308B\u307E\u3067\u3001\u7336\u4E88\u306F\u77ED\u3044\u3002"
+  - outcome: 2
+    line1: "\u602A\u7570\u306F\u6761\u4EF6\u4ED8\u304D\u3067\u5354\u529B\u3092\u53D7\u3051\u5165\u308C\u305F\u3002"
+    line2: "\u4EE3\u511F\u306F\u201C\u898B\u306A\u3044\u3053\u3068\u201D\u3002\u3042\u306A\u305F\u306F\u9837\u304F\u3002"
+    line3: "\u99C5\u306E\u5F71\u304C\u3001\u5473\u65B9\u306B\u306A\u3063\u305F\u6C17\u304C\u3057\u305F\u3002"
+  - outcome: 3
+    line1: "\u5C01\u5370\u306F\u5B8C\u4E86\u3057\u305F\u3002\u7A7A\u6C17\u304C\u8EFD\u304F\u306A\u308B\u3002"
+    line2: "\u305F\u3060\u3057\u201C\u5C01\u201D\u306F\u6C38\u4E45\u3067\u306F\u306A\u3044\u3068\u76F4\u611F\u3059\u308B\u3002"
+    line3: "\u3042\u306A\u305F\u306F\u6B21\u306E\u5834\u6240\u3078\u5411\u304B\u3046\u6E96\u5099\u3092\u59CB\u3081\u305F\u3002"
+  - outcome: 4
+    line1: "\u8A0E\u4F10\u3002\u9759\u5BC2\u3060\u3051\u304C\u6B8B\u3063\u305F\u3002"
+    line2: "\u76E3\u8996\u6620\u50CF\u306F\u3001\u809D\u5FC3\u306A\u77AC\u9593\u3060\u3051\u6B20\u3051\u3066\u3044\u305F\u3002"
+    line3: "\u80F8\u306B\u3001\u5272\u308A\u5207\u308C\u306A\u3044\u9055\u548C\u611F\u304C\u6B8B\u308B\u3002"

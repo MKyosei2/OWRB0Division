@@ -1,11 +1,9 @@
-// Auto-updated: 2026-01-09
 using System;
 
 namespace OJikaProto
 {
     /// <summary>
     /// AI-free recap templates. For prototype, keep it deterministic and short.
-    /// This file is intentionally data-only so it can be reused in public demos without extra dependencies.
     /// </summary>
     public static class ProtoRecapDatabase
     {
@@ -13,7 +11,7 @@ namespace OJikaProto
         public class RecapContent
         {
             public string caseTitle;
-            public string[] summaryLines; // ideally 3 lines
+            public string[] summaryLines; // 3 lines
             public string objectiveLine;  // 1 line
             public string[] controlHints; // up to 3
             public string[] ruleTags;     // up to 2
@@ -31,38 +29,38 @@ namespace OJikaProto
                     "監視映像に不可解な欠損があり、規約の気配がある。",
                     "次は異界で原因を突き止め、交渉で収束させる。"
                 },
-                objectiveLine = "次の目的：現場で証拠を集め、規約の手がかりを得る",
-                controlHints = new[] { "調べる：E", "走る：Shift", "メニュー：Esc" },
-                ruleTags = new string[0]
+                objectiveLine = "次の目的：異界で規約を破らずに崩し、交渉に持ち込む",
+                controlHints = new[] { "回避：Shift", "ガード：RMB", "ロックオン：MMB" },
+                ruleTags = new string[0],
             };
 
             if (state == null) return c;
 
+            // Use checkpoint-specific templates
             switch (state.checkpointId)
             {
                 case "EP1_INVEST":
                     c.summaryLines = new[]
                     {
-                        "証拠を集め、規約の輪郭を掴んだ。",
-                        "監視が強まり、現場は“異界化”へ傾く。",
-                        "次は異界で原因を突き止め、交渉で収束させる。"
+                        "駅で“終電が来ない”という通報が入った。",
+                        "現場には“規約”の痕跡があり、手がかりが必要だ。",
+                        "証拠を集め、異界突入の条件を満たす。"
                     };
-                    c.objectiveLine = "次の目的：異界に踏み込み、規約の条件を把握する";
-                    c.controlHints = new[] { "調べる：E", "隠れる：C", "監視回避：視界外へ" };
+                    c.objectiveLine = "次の目的：調査ポイントで証拠を集める（必要数を揃える）";
+                    c.controlHints = new[] { "調査：E", "移動：WASD", "カメラ：マウス" };
+                    c.ruleTags = new[] { "規約：？？？" };
                     break;
 
                 case "EP1_BREAK":
                     c.summaryLines = new[]
                     {
+                        "監視映像の欠損から、怪異の“規約”を特定した。",
                         "異界に踏み込めば、規約が戦闘ルールを変える。",
-                        "規約を守って“崩し”に成功すると交渉に移行できる。",
-                        "討伐以外でも決着できることが、この局の武器だ。"
+                        "崩しに成功すると交渉に移行し、討伐以外で決着できる。"
                     };
-                    c.objectiveLine = "次の目的：規約を破らずに崩し、交渉に持ち込む";
+                    c.objectiveLine = "次の目的：異界で規約を破らずに崩し、交渉に持ち込む";
                     c.controlHints = new[] { "回避：Shift", "ガード：RMB", "交渉：ブレイク後F" };
-                    c.ruleTags = (state.ruleTags != null && state.ruleTags.Length > 0)
-                        ? state.ruleTags
-                        : new[] { "視線NG", "反復NG" };
+                    c.ruleTags = (state.ruleTags != null && state.ruleTags.Length > 0) ? state.ruleTags : new[] { "視線NG", "反復NG" };
                     break;
 
                 case "EP1_END":
@@ -81,11 +79,6 @@ namespace OJikaProto
             // Override objective if provided
             if (!string.IsNullOrEmpty(state.nextObjective))
                 c.objectiveLine = "次の目的：" + state.nextObjective;
-
-            // Normalize sizes (avoid UI edge cases)
-            c.summaryLines ??= Array.Empty<string>();
-            c.controlHints ??= Array.Empty<string>();
-            c.ruleTags ??= Array.Empty<string>();
 
             return c;
         }

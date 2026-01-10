@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: NegotiationDefinition_Case01
+  m_EditorClassIdentifier: Assembly-CSharp:OJikaProto:NegotiationDefinition
+  title: "\u505C\u6226\u4EA4\u6E09"
+  prompt: "\u602A\u7570\u306F\u5D29\u308C\u3066\u3044\u308B\u3002\u4ECA\u306A\u3089\u6761\u4EF6\u6B21\u7B2C\u3067\u53CE\u675F\u3067\u304D\u308B\u3002"
+  options:
+  - label: "\u505C\u6226\uFF08\u671F\u9650\u4ED8\u304D\uFF09"
+    description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
+    baseChance: 0.65
+    evidenceBonusTags: 
+    minEvidenceToSucceed: -1
+    success: 1
+    isEmergencyOption: 0
+    consumesArbitrationPass: 0
+    extraAdminCost: 0.35
+    extraTruceDebt: 1
+  - label: "\u5951\u7D04\uFF08\u5354\u529B\uFF09"
+    description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
+    baseChance: 0.5
+    evidenceBonusTags: 
+    minEvidenceToSucceed: -1
+    success: 2
+    isEmergencyOption: 0
+    consumesArbitrationPass: 0
+    extraAdminCost: 0.35
+    extraTruceDebt: 1
+  - label: "\u5C01\u5370\uFF08\u5100\u5F0F\uFF09"
+    description: "\u671F\u9650\u4ED8\u304D\u306E\u505C\u6226\u3092\u63D0\u6848\u3059\u308B\u3002"
+    baseChance: 0.45
+    evidenceBonusTags: 
+    minEvidenceToSucceed: -1
+    success: 3
+    isEmergencyOption: 0
+    consumesArbitrationPass: 0
+    extraAdminCost: 0.35
+    extraTruceDebt: 1
+  cooldownSeconds: 12
+  failEnrage: 1
+  sealRitualEnabled: 1
+  sealRitualSteps: 4
+  sealStepTimeSeconds: 1.1
+  sealFailAdminCost: 0.06
